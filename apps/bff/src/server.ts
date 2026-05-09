@@ -48,6 +48,58 @@ const copilotApp = createCopilotEndpoint({
 // CopilotKit runtime, so we can short-circuit problematic paths.
 const app = new Hono();
 
+// In-memory thread name store — survives while the process is alive.
+// Replaces the persistence layer that would normally come from
+// CopilotKitIntelligence (intentionally not wired here).
+const threadNames = new Map<string, string>();
+const threadCreatedAt = new Map<string, string>();
+
+const touchThread = (id: string, name?: string) => {
+  if (name !== undefined) threadNames.set(id, name);
+  if (!threadCreatedAt.has(id)) {
+    threadCreatedAt.set(id, new Date().toISOString());
+  }
+};
+
+const serializeThread = (id: string) => ({
+  id,
+  name: threadNames.get(id) ?? "",
+  agentId: "default",
+  createdAt: threadCreatedAt.get(id) ?? new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+// PATCH /api/copilotkit/threads/:id — rename a thread.
+// Body: {"name": "string"} → 200 {id, name, agentId, createdAt, updatedAt}
+app.patch("/api/copilotkit/threads/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const name = body?.name;
+  if (typeof name !== "string" || !name.trim()) {
+    return c.json({ error: "Missing or invalid `name` in body" }, 400);
+  }
+  touchThread(id, name.trim());
+  return c.json(serializeThread(id), 200);
+});
+
+// DELETE /api/copilotkit/threads/:id — remove from the local store.
+// CopilotRuntime would 422 here too without Intelligence; same workaround.
+app.delete("/api/copilotkit/threads/:id", (c) => {
+  const id = c.req.param("id");
+  threadNames.delete(id);
+  threadCreatedAt.delete(id);
+  return c.json({ id, deleted: true }, 200);
+});
+
+// GET /api/copilotkit/threads?agentId=default — list threads with rename
+// applied. Filter by agentId when present.
+app.get("/api/copilotkit/threads", (c) => {
+  const agentId = c.req.query("agentId");
+  if (agentId && agentId !== "default") return c.json({ threads: [] }, 200);
+  const threads = Array.from(threadNames.keys()).map(serializeThread);
+  return c.json({ threads }, 200);
+});
+
 // Some CopilotKit clients probe the runtime base path before hitting
 // /agent/:id/run. The v2 runtime registers .all("*") for /api/copilotkit
 // and returns 404 internally for the bare path. Intercept here and
