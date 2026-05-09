@@ -4,19 +4,21 @@ Wires:
 - A switchable runtime (Gemini Flash-Lite + deepagents | Gemini Flash-Lite + react |
   Claude Sonnet 4.6 + react) selected by `AGENT_RUNTIME`. See
   `src/runtime.py` and the README's "Switching to a different model".
-- Notion-MCP-backed backend tools (always present; Notion read goes through
-  the official `@notionhq/notion-mcp-server` via mcp-use)
+- Crisis Manager backend tools — `generate_crisis`, `fetch_weather`,
+  `generate_timeline`. See `src/notion_tools.py` (file name is legacy; the
+  contents are Crisis-flavored after the hackathon rewrite).
 - TimingMiddleware (per-turn wall-time logging — see `src/timing.py`)
-- LeadStateMiddleware + CopilotKitMiddleware for canvas state + AG-UI
+- CrisisStateMiddleware + CopilotKitMiddleware for canvas state + AG-UI
 
-Frontend tools (`createItem`, `setItemName`, `setProjectField1`, etc.) are
-declared on the React side via `useFrontendTool({ name, parameters,
-handler })` in `src/app/page.tsx`. The runtime forwards those declarations
-into the agent's tool list at run time, so we deliberately do NOT include
-the Python `frontend_tool_stubs` here — adding them would cause Gemini to
-reject the request with "Duplicate function declaration found: <name>".
-The Python stubs in `agent/src/canvas.py` exist purely as documentation of
-the contract the frontend is expected to honor.
+Frontend tools (`setCrisis`, `setSafeZones`, `setChecklist`,
+`toggleChecklistItem`, `setActiveModule`, etc.) are declared on the React
+side via `useFrontendTool({ name, parameters, handler })` in
+`apps/frontend/src/app/leads/page.tsx`. The runtime forwards those
+declarations into the agent's tool list at run time, so we deliberately
+do NOT include the Python `frontend_tool_stubs` here — adding them would
+cause Gemini to reject the request with "Duplicate function declaration
+found: <name>". The Python stubs in `agent/src/canvas.py` exist purely as
+documentation of the contract the frontend is expected to honor.
 """
 
 from __future__ import annotations
@@ -26,13 +28,12 @@ import os
 from dotenv import load_dotenv
 
 from src.intelligence_cleanup import wipe_orphan_threads
-from src.lead_store import boot_status as _lead_store_boot_status
-from src.notion_tools import load_notion_tools
+from src.notion_tools import load_crisis_tools
 from src.prompts import build_system_prompt
 from src.runtime import build_graph
 
 
-# Load .env early so GEMINI_API_KEY / NOTION_TOKEN / ANTHROPIC_API_KEY are visible.
+# Load .env early so GEMINI_API_KEY / ANTHROPIC_API_KEY are visible.
 load_dotenv()
 
 
@@ -45,28 +46,6 @@ load_dotenv()
 wipe_orphan_threads()
 
 
-def _format_integration_status() -> str:
-    """Run the boot-time lead-store health check and format a status string.
-
-    Reports whichever store is active — Notion when both NOTION_TOKEN
-    and NOTION_LEADS_DATABASE_ID are set, the bundled local JSON
-    otherwise. Logs a one-liner so `npm run dev` tails show the active
-    source clearly. The returned string is interpolated into the system
-    prompt so the agent can refuse-with-reason when something is off
-    rather than silently returning an empty board.
-    """
-    try:
-        line = _lead_store_boot_status()
-    except Exception as e:  # noqa: BLE001 - never block agent boot on this
-        print(f"[lead_store] FAILED: {e}", flush=True)
-        return f"error: lead_store boot_status raised: {e}"
-
-    print(f"[lead_store] {line}", flush=True)
-    return line
-
-
-# Stub-key warnings for the active runtime live closer to the runtime selector.
-# The Gemini runtimes still warn here so the message is loud at boot.
 _AGENT_RUNTIME = os.getenv("AGENT_RUNTIME", "gemini-flash-deep")
 print(f"[runtime] AGENT_RUNTIME={_AGENT_RUNTIME}", flush=True)
 
@@ -83,11 +62,10 @@ if _AGENT_RUNTIME.startswith("gemini-") and (
     )
 
 
-backend_tools = load_notion_tools()
+backend_tools = load_crisis_tools()
 
 
-_integration_status = _format_integration_status()
-SYSTEM_PROMPT = build_system_prompt(_integration_status)
+SYSTEM_PROMPT = build_system_prompt()
 
 
 _use_noop = (

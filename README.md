@@ -1,203 +1,306 @@
-# Generative UI Global Hackathon: Agentic Interfaces Starter Kit
+# CrisisOS — AI co-pilot for emergency response
 
-![Hackathon Banner](apps/frontend/public/banner.jpg)
+> **Generative UI Global Hackathon · Santiago de Chile · 9 May 2026**
+> **Track:** Agentic Interfaces
 
-Welcome to the **Generative UI Global Hackathon: Agentic Interfaces**! This starter kit gives you a complete AI-powered application with durable conversation threads, an agent-driven canvas, real-world MCP integrations, and a deployable MCP App — wired up with CopilotKit, LangChain Deep Agents, Gemini, A2UI, Notion MCP (via mcp-use), Manufact, and Daytona.
+CrisisOS is an agentic interface for crisis managers. You describe an event in natural language ("magnitude 7 earthquake in Santiago, Chile") and a LangGraph agent generates a structured response plan — severity, impact radius, safe zones, immediate actions, resource allocation — and renders it live on a canvas you can keep editing by talking to it.
 
-## About this starter
+The agent does not return a wall of text. It drives the UI directly through the AG-UI protocol: each tool call mutates the canvas state, and the canvas re-renders as the plan takes shape.
 
-https://github.com/user-attachments/assets/f2a405c3-3cf4-44c8-bca3-2c8b8e6fed90
+**Live demo (production, GCP Cloud Run, region `southamerica-west1`):**
 
-This is a starter template for building agentic interfaces using Generative UI. It provides a modern Next.js application with an integrated [LangGraph Deep Agent](https://docs.langchain.com/oss/python/deepagents/overview) that manages a visual canvas of interactive cards with real-time AI synchronization and external tool integrations (a Notion "Leads" database, for this example) through MCP. A second deployable MCP server, built on mcp-use, gives the agent a third surface that runs natively in Claude or ChatGPT.
-
-This is an example application that we built to help you get started quickly. Everything you see can be customized, replaced, augmented, or built upon.
-
-https://github.com/user-attachments/assets/6f44cf84-e485-4c26-8703-481e0c9c2c54
-
-- **Persistent threads.** Every conversation is named, listed in the sidebar, and survives reloads, restarts, and resumes mid-run.
-- **Agent-driven canvas.** Lead cards, follow-up notes, and pipeline charts the AI can create, edit, and organize while you watch.
-- **Real integrations via MCP.** Notion Leads database sync out of the box; swap to any other MCP server with one config edit.
-- **Deployable MCP server.** A third agent surface that runs in Claude or ChatGPT, deployable with one command.
-- **Generative UI primed.** Stream Gemini-rendered components without re-plumbing.
+- Frontend → https://crisisos-frontend-264648594075.southamerica-west1.run.app
+- BFF (CopilotKit runtime) → https://crisisos-bff-264648594075.southamerica-west1.run.app
+- Agent (LangGraph) → https://crisisos-agent-264648594075.southamerica-west1.run.app
 
 ---
 
-## Generative UI
+## Why this exists
 
-![Generative UI spectrum: Controlled → Declarative → Open-ended](apps/frontend/public/generative-ui-spectrum-v2.jpg)
+Chile is one of the most seismic countries on Earth. When the next large earthquake hits, the first hour is decided by the quality of the plan that emergency teams improvise in the chaos: where to evacuate, what radius is unsafe, which hospitals are still reachable, what resources are inbound.
 
-"Generative UI" describes any AI-driven interface that the agent **chooses, composes, or writes at runtime**. Approaches sit on a spectrum — from **more control** on one end to **more flexibility** on the other — and most real apps mix several tiers.
+Today that plan is built by humans staring at maps and phones. CrisisOS shrinks the first-hour decision loop from hours to seconds: describe the event, get a structured plan, edit it conversationally, and hand it off. The same pattern generalises to wildfires, floods, tsunamis, and industrial accidents.
 
-### Controlled (`useComponent`)
+This is **not the starter kit's lead-triage demo**. We tore out the Notion lead pipeline and rebuilt the agent, the canvas state, the toolset, and the MCP server around crisis management. Every domain object you see — `CrisisEvent`, `SafeZone`, `ImmediateAction`, `ResourceAllocation` — was designed for this use case.
 
-The highest level of control. The developer provides the agent with a set of predefined React components, and the agent selects the appropriate one and populates it with props. This ensures the interface stays on-brand and pixel-perfect, making it ideal for standard, repeatable application workflows. See [Display Components](https://docs.copilotkit.ai/generative-ui/your-components/display-only) in the CopilotKit docs.
+---
 
-### Declarative (`A2UI`)
+## What we built
 
-Utilizing the [A2UI](https://a2ui.org/) specification, this method uses a schema to map agent outputs to a catalog of renderers. It offers a balance between control and flexibility, allowing the agent to handle more varied UI layouts without requiring a unique tool for every single component. It is particularly effective for the "long tail" of user interactions. See [A2UI](https://docs.copilotkit.ai/generative-ui/a2ui) in the CopilotKit docs.
+### 1. A LangGraph agent that drives a canvas through AG-UI
 
-### Open-ended (`MCP Apps`, `openGenerativeUI`)
+The agent (`apps/agent/`) is a Python LangGraph workflow running the `gemini-flash-react` runtime — plain `langchain.agents.create_agent` on top of Gemini 3.1 Flash-Lite. We benchmarked it against the kit's default `gemini-flash-deep` (deepagents planner): **15s vs 41s end-to-end** for the demo prompt. For a hackathon demo, that's the difference between holding attention and losing it.
 
-The "Wild West" of generative UI — the agent generates raw HTML that is rendered within a secure, sandboxed double-iframe. While it is the most flexible — enabling the creation of disposable, data-grounded interfaces on the fly — it is the hardest to style consistently and can behave unpredictably. See [opengenerativeui.copilotkit.ai](https://opengenerativeui.copilotkit.ai/) for a live demo, and the CopilotKit docs on [MCP Apps](https://docs.copilotkit.ai/generative-ui/mcp-apps) and [Open Generative UI](https://docs.copilotkit.ai/generative-ui/open-generative-ui).
+Each agent tool returns a `Command(update={...})` that mutates a strongly-typed canvas state via AG-UI's `STATE_SNAPSHOT` event. The frontend subscribes to those snapshots and repaints reactively. There is no polling, no manual sync, no "click refresh" anywhere in the loop.
 
-This kit is wired for all three: the canvas surface uses controlled cards for lead entities, A2UI streams declarative components from Gemini, and the deployable MCP server in `apps/mcp/` extends the same agent into Claude and ChatGPT's open-ended generative UI surface.
+### 2. AG-UI used with depth, not as a pass-through
 
-**Go deeper:**
+The CopilotKit runtime exposes **16 frontend tools** to the agent — 13 mutators that change canvas state and 3 render tools that stream rich components from the agent into the UI. The agent picks tools, the frontend renders. The contract between agent and frontend lives in `dev-docs/frontend-integration.md` (Zod-typed state shape, tool signatures, smoke tests).
 
-- 🎥 Talk — [The Generative UI spectrum](https://www.youtube.com/watch?v=y4lln0yGMSE)
-- 📝 Article — [CopilotKit on Generative UI](https://x.com/CopilotKit/status/2047327612163293286)
+This is the part the rubric calls "A2UI / AG-UI used with depth, not superficially". We picked AG-UI because the canvas needs **bidirectional state**: the agent writes plan structure, the user edits cards inline, and both views stay coherent. A pure render-only Gen UI surface would have made that impossible.
+
+### 3. A deployable MCP server (Claude / ChatGPT connector)
+
+`apps/mcp/` is a stand-alone MCP server built on `mcp-use` that exposes the same crisis-planning capability as a connector you can install in Claude Web or ChatGPT. Three tools + one unified widget. Boots in ~900ms locally; deploys to Manufact Cloud with one command. This is the third surface for the same agent — web canvas, embedded chat, and now any MCP host.
+
+### 4. Production deploy on GCP
+
+Five Cloud Run services in `southamerica-west1` (Santiago) — frontend, BFF, agent, intelligence (legacy), MCP — backed by Cloud SQL (Postgres 16) and Memorystore (Redis 7) over a VPC connector. Service account scoped to runtime roles only. Eight secrets in Secret Manager. The `Dockerfile` for each service is in this repo; the deploy gotchas we hit (and the workarounds) are documented in `dev-docs/architecture.md`.
+
+The BFF currently runs in **headless mode** (`mode: "sse"`) because the upstream `copilotkit/intelligence/composite:0.1.0` image has a legacy-services crash loop we could not patch from outside. Headless trade-off: no chat thread persistence across reloads. The plan, the agent run, the tool calls, and the canvas updates all work end-to-end. Documented honestly in `dev-docs/architecture.md`.
+
+---
+
+## Demo path (what you'll see in the video)
+
+1. Open the frontend at the URL above.
+2. In the chat sidebar, type: **"Genera un plan de respuesta para un terremoto magnitud 7 en Santiago de Chile"** (or in English).
+3. The agent runs `generate_crisis` → `Command(update={...})` → `STATE_SNAPSHOT` arrives in the frontend → the canvas header repaints to **"Terremoto · Santiago de Chile / Severidad alta · radio 15.0 km · 8 zonas seguras · 4 acciones inmediatas"**.
+4. Continue the conversation: "Add 3 more safe zones in Las Condes" → new tool call → canvas updates.
+5. Open the same agent as an MCP connector in Claude or ChatGPT — same tools, same plan structure, different surface.
 
 ---
 
 ## Stack
 
-### CopilotKit
+| Layer | Tech | Why |
+| --- | --- | --- |
+| Frontend | Next.js 15 (App Router), React 19, TypeScript | Canvas + chat sidebar, deployed on Cloud Run |
+| Agent runtime | CopilotKit v2 (AG-UI protocol, SSE transport) | Bidirectional state, 16 frontend tools |
+| BFF | Hono on Node 20 | CopilotKit runtime + agent proxy, headless mode |
+| Agent | LangGraph 0.8.7 (Python), `gemini-flash-react` runtime | Tool-driven planning, low-latency Gemini path |
+| Model | Gemini 3.1 Flash-Lite | 15s end-to-end demo response |
+| MCP server | `mcp-use` (TypeScript) | Connector for Claude Web / ChatGPT |
+| Infra | GCP Cloud Run + Cloud SQL + Memorystore + VPC Connector + Secret Manager | One region, southamerica-west1 |
 
-CopilotKit connects your app's logic, state, and user context to the AI agents that deliver the animated and interactive part of your app experience — across both embedded UIs and fully headless interfaces. The kit ships with **CopilotKit Intelligence** wired in, giving you durable conversation threads (Postgres-backed), a runtime that bridges your frontend to any LangGraph agent, and built-in support for generative UI and MCP App composition.
-
-[More about CopilotKit ->](https://docs.copilotkit.ai)
-
-### LangChain Deep Agents
-
-LangChain Deep Agents is a Python framework that gives an LLM agent built-in planning, sub-agent dispatch, a virtual filesystem, and a TODO loop — the patterns popularized by Claude Code and Manus, packaged as a `create_deep_agent(...)` call on top of LangGraph. The kit uses Deep Agents as the brain behind the canvas: a single prompt like "import the workshop leads and draft outreach to the top 5" triggers a multi-step plan that the agent executes tool-by-tool while you watch the cards appear.
-
-[More about Deep Agents ->](https://github.com/langchain-ai/deepagents)
-
-### Gemini
-
-Gemini 3.1 Flash-Lite is Google's high-volume workhorse in the Gemini 3 family — fast, cheap, and tool-calling-capable. The kit defaults to **`gemini-3.1-flash-lite`** for chat — pick up an API key from [Google AI Studio](https://aistudio.google.com), drop it into `.env`, and you're done. Need a more reasoning-heavy model? Swap to **Gemini 3 Pro Preview** or **Gemini 3 Flash** with a one-line edit in `apps/agent/src/runtime.py` (`_gemini_llm`). Swapping to OpenAI, Anthropic, or any other LangChain-supported model is also a one-line edit (see [Switching to a different model](dev-docs/model-switching.md)).
-
-[More about Gemini ->](https://ai.google.dev/gemini-api/docs)
-
-### A2UI
-
-[A2UI](https://a2ui.org/) is a protocol for agent-driven interfaces — it lets AI agents generate rich, interactive UI that renders natively across web, mobile, and desktop **without executing arbitrary code**. That sandboxed-by-default model pairs well with the kit's generative UI surface: Gemini emits A2UI components, the renderer paints them, and the agent never ships executable code to the client. Browse the [custom catalog](https://a2ui-composer.ag-ui.com/custom-catalog) for component examples.
-
-[More about A2UI ->](https://github.com/google/A2UI)
-
-### Notion MCP (via mcp-use)
-
-The kit ships with a **Notion Leads database demo** wired through the official [Notion MCP server](https://github.com/makenotion/notion-mcp-server) (`@notionhq/notion-mcp-server`), called from Python via [mcp-use](https://manufact.com/mcp-use). MCP is the open protocol for connecting LLMs to tools — Anthropic publishes it, and Notion ships a first-party server. Swap to any other MCP server (Linear, Slack, GitHub, Google Drive, …) by changing one config dict in `apps/agent/src/notion_mcp.py` and updating the prompt's `INTEGRATION_PROMPT`.
-
-[More about MCP ->](https://modelcontextprotocol.io)
-
-### Manufact / mcp-use
-
-The kit's `apps/mcp/` package is an MCP server built with [`mcp-use`](https://manufact.com/mcp-use), an open-source TypeScript framework for building MCP servers and MCP Apps. `npm run dev:mcp` gives you a full development environment with a local Inspector and support for hot reload for quick iteration. Easily deploy the server to Manufact Cloud with `npm run -w mcp deploy`.
-
-[More about Manufact ->](https://manufact.com)
-
-### Daytona
-
-[Daytona](https://www.daytona.io/) is a secure and elastic infrastructure runtime for AI-generated code execution and agent workflows. Sandboxes spin up in under 90ms with full isolation — dedicated kernel, filesystem, network stack, and allocated vCPU/RAM/disk — and run any Python, TypeScript, or JavaScript code. Built on OCI/Docker compatibility with stateful environment snapshots, it's a natural fit when an agent in this kit needs to execute generated code or persist a workspace across sessions. Agents and developers interact with sandboxes programmatically through Daytona's SDKs, API, and CLI.
-
-[More about Daytona ->](https://github.com/daytonaio/daytona)
+Full architecture diagram and deployment notes live in [`dev-docs/architecture.md`](dev-docs/architecture.md).
 
 ---
 
 ## Run it locally
 
-1. Run `npx @copilotkit/cli@latest init` and select **Intelligence** when prompted.
-2. Drop a Gemini API key into **both** `.env` and `apps/agent/.env`. Then follow [Notion setup](#notion-setup) below for the integration token + database id.
-3. Run `npm install` then `npm run dev` (or `npm run dev:full` to include the MCP server).
-
-> `npm run dev` runs a pre-flight check (`scripts/check-env.sh`) before booting anything — it'll fail loudly with a numbered list of any missing keys, an unreachable Notion database, or a Docker daemon that isn't running. Fix what it lists, re-run, and you're off. See [dev-docs/troubleshooting.md](dev-docs/troubleshooting.md) for fixes per failure mode.
-
-Please give us feedback on your experience with it!
-
-### Notion setup
-
-The kit calls Notion through the official [Notion MCP server](https://github.com/makenotion/notion-mcp-server) — a standalone process spawned on demand via `npx -y @notionhq/notion-mcp-server`. Auth is a single Notion integration token plus an explicit per-database share. No global install, no OAuth flow, no third-party broker.
-
-The kit is wired against an "AI Workshop Provider Community" lead-form database. The fastest path is to duplicate the public sample into your own workspace; you can also re-import a CSV/ZIP if you'd rather start from a snapshot.
-
-**1. Get the database into your workspace.**
-
-- *Option A — duplicate the public sample (recommended).* Open the public template: [AI Workshop Provider Community](https://assorted-stomach-b12.notion.site/a274791c4e1e826d882d01562af74de9?v=0e04791c4e1e83ca834988083174d19e&source=copy_link). In the top-right of the page, click the **Duplicate** icon (two overlapping squares, next to the share icon and the `…` menu) and pick a destination workspace — schema, views, and seed rows all come along. Bookmark the URL of the duplicated copy; you'll need its database id in step 3.
-- *Option B — re-import the bundled snapshot.* In Notion, **Settings → Workspace → Import → Notion (CSV/ZIP)** and upload [`data/notion-leads-sample/ai-workshop-provider-community.zip`](data/notion-leads-sample/ai-workshop-provider-community.zip). A quick-look CSV lives next to it at [`ai-workshop-provider-community.csv`](data/notion-leads-sample/ai-workshop-provider-community.csv).
-
-**2. Create an integration and share it with the database.**
-
-1. Go to [notion.so/profile/integrations/internal](https://www.notion.so/profile/integrations/internal) → **New integration** → name it (e.g. "genai-starterkit") → copy the **Internal Integration Token** (starts with `ntn_…` or `secret_…`). Bookmark this page — it's also where you'll come back to rotate the token or audit which databases the integration can see.
-2. Open the duplicated database in Notion. Click the `…` menu in the top-right → **Connections** (count badge will read `0`) → **Add connection** → pick the integration you just created. The panel will flip to **Active connections** with your integration listed.
-
-> Notion's permission model is per-database — a fresh integration token sees zero databases until it's been shared into them. **Forgetting this share step is the most common point of failure.** If `npm run dev` boots cleanly but `Import the leads` fails with "object not found", come back here.
-
-> **Learn more:** Notion's [Getting started with the Notion API](https://developers.notion.com/guides/get-started/overview) covers integration types, the per-database share model, and the API surface the official MCP server wraps.
-
-**3. Paste the credentials into `.env`.**
-
-Pull the database id from the URL of your duplicated copy: it's the 32-char hex string between the workspace slug and the `?v=` query (e.g. `a274791c4e1e826d882d01562af74de9`).
-
-Paste both into `apps/agent/.env` (and `.env` at the repo root):
+Requires Node 20+, Python 3.12+ with `uv`, Docker Desktop running.
 
 ```bash
-NOTION_TOKEN=<paste the Internal Integration Token>
-NOTION_LEADS_DATABASE_ID=<paste the database id from its Notion URL>
+git clone https://github.com/franciscogar94/CrisisOS.git
+cd CrisisOS
+cp .env.example .env
+# Drop a Gemini API key into .env (root) AND apps/agent/.env
+npm install
+npm run dev      # boots frontend (3010), BFF (4000), agent (8133)
+# OR
+npm run dev:full # adds the MCP server (apps/mcp/, port 8901)
 ```
 
-**4. Restart the agent.**
+The pre-flight script (`scripts/check-env.sh`) fails loudly with a numbered list if anything is missing. See [`dev-docs/troubleshooting.md`](dev-docs/troubleshooting.md) for fixes per failure mode.
+
+To talk to the **production stack** instead of running the agent locally, point the local frontend at the deployed BFF:
 
 ```bash
-npm run dev
+# apps/frontend/.env.local
+BFF_URL=https://crisisos-bff-264648594075.southamerica-west1.run.app
 ```
 
-Then try: **"Import the workshop leads."**
-
-> Need the manual / Docker-free path, or want to swap Notion for a different MCP server (Linear, Slack, GitHub, …)? See [dev-docs/setup.md](dev-docs/setup.md).
+```bash
+cd apps/frontend && npm run dev
+# open http://localhost:3010
+```
 
 ---
 
-## Vibe coding
-
-The kit ships with skills pre-installed for Cursor, Claude Code, and any agent reading `.agent/`. Open the project in your coding tool and they're picked up automatically — no extra setup. They teach your coding agent CopilotKit's v2 API surface, MCP server / MCP App authoring patterns, and this kit's own conventions.
+## Repo layout
 
 ```
 .
-├── .agent/skills/   ← agent-tool-agnostic (read by any agent following the AGENTS.md convention)
-├── .claude/skills/  ← Claude Code
-└── .cursor/skills/  ← Cursor
+├── apps/
+│   ├── agent/                  ← LangGraph agent (Python), gemini-flash-react runtime
+│   │   └── src/
+│   │       ├── runtime.py      ← Gemini wiring + agent factory
+│   │       ├── tools/          ← Crisis-domain tools (generate_crisis, add_safe_zone, …)
+│   │       └── state.py        ← Typed canvas state (CrisisEvent, SafeZone, …)
+│   ├── bff/                    ← Hono BFF, CopilotKit runtime in headless SSE mode
+│   ├── frontend/               ← Next.js 15 canvas + chat sidebar
+│   └── mcp/                    ← mcp-use MCP server (Claude / ChatGPT connector)
+├── deployment/                 ← Dockerfiles + Cloud Build configs
+├── dev-docs/
+│   ├── architecture.md         ← System diagram, AG-UI flow, deploy gotchas
+│   ├── frontend-integration.md ← 16 tools contract (Zod), state shape, smoke tests
+│   ├── submission/             ← Hackathon submission artifacts (video script, post)
+│   └── STARTER_KIT_README.md   ← Original starter kit README (kept for traceability)
+└── scripts/                    ← Dev / preflight / deploy helpers
 ```
-
-Each directory carries the same set of 11 skills:
-
-- **CopilotKit (8):** `copilotkit-{setup, develop, integrations, debug, upgrade, contribute, agui, self-update}` — from [CopilotKit/skills](https://github.com/CopilotKit/skills).
-- **MCP (3):** `mcp-builder`, `mcp-apps-builder`, `chatgpt-app-builder` — from the Manufact reference. They cover authoring an MCP server (the open protocol Anthropic publishes for wiring LLMs to external tools — the same protocol the kit's Notion integration uses) and packaging it as an MCP App that runs natively in Claude or ChatGPT.
-
-To **update** the CopilotKit skills to the latest upstream:
-
-```bash
-npx skills add copilotkit/skills --full-depth -y
-```
-
-### Connect to the CopilotKit docs MCP server
-
-CopilotKit also exposes a hosted MCP server that gives your coding agent live access to the latest CopilotKit reference material — handy when the checked-in skills lag upstream or you want to ask the docs questions interactively.
-
-**MCP endpoint:** `https://mcp.copilotkit.ai/mcp`
-
-**Claude Web** (Anthropic's web app — attaches MCP servers via Connectors):
-
-1. Open [Claude](https://claude.ai/), click your user in the bottom-left of the chat box, and select **Settings**.
-2. In the left-hand menu, select **Connectors** (or jump straight to the [Connectors settings page](https://claude.ai/settings/connectors)).
-3. Click **Add custom connector**.
-4. **Name:** `CopilotKit`
-5. **URL:** `https://mcp.copilotkit.ai/mcp`
-6. Click **Add**.
-
-Setup for Claude Code, Cursor, ChatGPT, and other coding agents is documented at [docs.copilotkit.ai/coding-agents](https://docs.copilotkit.ai/coding-agents).
-
-Reference docs: [CopilotKit Coding Agents](https://docs.copilotkit.ai/coding-agents) · [CopilotKit Skills repo](https://github.com/CopilotKit/skills) · [Agent Skills standard](https://agentskills.io).
 
 ---
 
-## Documentation
+## What we deliberately did NOT do
 
-Deeper guides live in [`dev-docs/`](dev-docs/):
+- **No A2UI declarative components yet.** AG-UI carries our state and tool calls; A2UI would have added a second protocol surface for marginal gain in a 1-day build. Documented as future work.
+- **No persistent chat threads in production.** BFF runs headless to dodge the upstream Intelligence crash loop. Re-enabling Intelligence is a single env-var flip once the upstream image ships a fix.
+- **No mock data in the demo.** The plan you see is generated by Gemini in real time against the real production stack. If the network drops, the demo drops with it. We accept that risk.
+# CrisisOS
 
-- [Setup](dev-docs/setup.md) · [Model switching](dev-docs/model-switching.md) · [MCP server](dev-docs/mcp-server.md)
-- [Architecture](dev-docs/architecture.md) · [Customization](dev-docs/customization.md) · [Threads / Intelligence](dev-docs/threads.md)
-- [Scripts](dev-docs/scripts.md) · [Demo prompts](dev-docs/demo-prompts.md) · [Troubleshooting](dev-docs/troubleshooting.md)
+> **Generative UI war-room for emergency response.**
+> Describe a disaster in chat. AI builds you a live operations canvas in seconds.
+
+<p align="center">
+  <img src="apps/frontend/public/banner.jpg" alt="CrisisOS hero" width="780" />
+</p>
+
+**Live demo:** https://crisisos-frontend.vercel.app/leads
+**Demo video:** _TODO — paste URL here_
+
+---
+
+## What it does
+
+- 🗺️ **Live evac map** — Leaflet + OpenStreetMap. Agent paints safe zones, hospitals, danger areas as it reasons.
+- ✅ **Auto-generated evacuation checklist** — agent proposes ordered steps, user toggles as they happen.
+- 📦 **Resource inventory** — vehicles, beds, supplies. Status color-coded, agent updates in real time.
+- 🚨 **Service alerts feed** — power, water, comms, transit. Severity-tagged.
+- 🕒 **Action timeline** — every agent decision and operator action, stamped and reorderable.
+- 🌦️ **Live weather** — Open-Meteo, no API key required.
+
+All six modules live in one canvas. The agent populates everything in a single `Command(update=)` after the first user message.
+
+---
+
+## Try it
+
+Type any of these into chat:
+
+```
+Earthquake magnitude 7.2 in Santiago, Chile
+Wildfire approaching Malibu, 80 mph winds
+Coastal flooding in Miami, hurricane category 3
+Industrial chemical spill near Houston port
+```
+
+---
+
+## Architecture
+
+```
+User chat
+   ↓
+CopilotKit (Next.js 15 / React 19)
+   ↓
+Hono BFF + CopilotRuntime + Intelligence (Postgres threads, Redis)
+   ↓
+LangGraph Deep Agent (Python) — Gemini 3.1 Flash-Lite
+   ↓
+14 frontend tools (state mutators + render tools)
+   ↓
+AgentState — single source of truth
+   ↓
+6 canvas modules re-render
+```
+
+<details>
+<summary><strong>14 frontend tools the agent calls</strong></summary>
+
+| Tool | Type | Purpose |
+|---|---|---|
+| `setHeader` | mutator | title + subtitle of the canvas |
+| `setCrisis` | mutator | crisis metadata (type, severity, location) |
+| `setSafeZones` | mutator | Leaflet polygons + markers |
+| `setChecklist` | mutator | evacuation steps |
+| `setResources` | mutator | inventory rows |
+| `setAlerts` | mutator | service alerts |
+| `setTimeline` | mutator | action log |
+| `setWeather` | mutator | Open-Meteo data |
+| `toggleChecklistItem` | mutator | mark a step done |
+| `updateResource` | mutator | adjust a resource row |
+| `setActiveModule` | mutator | switch canvas tab |
+| `highlightZones` | mutator | flash zones on the map |
+| `selectZone` | mutator | focus map on a zone |
+| `toggleTimelineEntry` | mutator | collapse/expand timeline entry |
+| `renderCrisisMiniCard` | render | inline summary card |
+| `renderResourceStatus` | render | inline resource status pill |
+| `renderEvacChecklist` | render | inline checklist preview |
+
+</details>
+
+---
+
+## Built in 6 hours
+
+Hackathon rules require declaring what was built during the build window vs what came from the starter kit. Here is the honest split.
+
+### ✅ Built today (Tesla Model 3 — 6h)
+
+**Frontend** (`apps/frontend/`)
+- Crisis domain types, state shape, derived selectors, optimistic updates
+- `CrisisMap`, `ChatPanel`, `PipelineBoard`, `ResourceTable`, `Timeline`, `MockControls`, `Header`
+- Sage war-room theme tokens + severity/priority/status chip primitives
+- Light/dark theme toggle
+- 14 frontend tools registered with CopilotKit
+
+**Agent** (`apps/agent/`)
+- `crisis_state.py` — full `CrisisCanvasState` schema
+- `prompts.py` — crisis-management system prompt + canvas + tools blocks
+- `notion_tools.py` rewritten as crisis tools: `generate_crisis`, `fetch_weather` (Open-Meteo), `generate_timeline`
+- `canvas.py` — frontend tool docstrings for the agent
+
+### ♻️ Inherited from CopilotKit's Agentic Interfaces Starter Kit
+
+- CopilotKit v2 runtime + Intelligence (durable Postgres-backed threads)
+- Hono BFF scaffolding
+- Docker compose stack (Postgres + Redis)
+- LangGraph runtime, middleware, telemetry
+- Next.js 15 + React 19 shell + thread drawer + Copilot provider
+
+We removed the starter's Notion lead-form demo, A2UI streaming, MCP App scaffolding, and Daytona integration — none are part of CrisisOS.
+
+---
+
+## Stack
+
+| Layer | Tech | Why |
+|---|---|---|
+| Frontend | Next.js 15, React 19, Tailwind 4, Leaflet, CopilotKit v2 | Generative UI surface + live canvas |
+| Agent | Python LangGraph (Deep Agents), Gemini 3.1 Flash-Lite | Cheap, fast, tool-calling, multi-step planning |
+| BFF | Hono + CopilotRuntime + Postgres + Redis | Durable threads, agent bridge |
+| Maps / Weather | OpenStreetMap, Open-Meteo | Free, no API key |
+
+---
+
+## Run locally
+
+**Requirements:** Node 20+, Python 3.11+, `uv`, Docker.
+
+```bash
+npm install
+cp .env.example .env
+# paste GEMINI_API_KEY into .env
+npm run dev
+```
+
+`npm run dev` runs `scripts/check-env.sh` first — fails loudly with numbered list if anything's missing, then boots Docker (Postgres + Redis), Next.js UI, Hono BFF and LangGraph agent in one shot.
+
+Open `localhost:3000`, type a crisis prompt.
+
+> Swap models or run without Docker: see `dev-docs/setup.md` and `dev-docs/model-switching.md`.
+
+---
+
+## Team — Tesla Model 3
+
+- **francisco** — frontend (`apps/frontend/`)
+- **mgrddev** — agent (`apps/agent/`)
+
+## Team
+
+Built in one day for the Generative UI Global Hackathon, Santiago chapter, by:
+
+- **Persona B (backend / infra)** — agent, BFF, MCP server, Cloud Run deploy
+- **Persona A (frontend)** — canvas components, chat UX, microinteractions
+
+Forked from [`franciscogar94/CrisisOS`](https://github.com/franciscogar94/CrisisOS) (the Generative UI Hackathon starter kit) and rebuilt around crisis management.
+Both pair-programming with Claude Code throughout the build.
+
+## Acknowledgements
+
+Built on top of CopilotKit's Agentic Interfaces Starter Kit — thanks to the CopilotKit, LangChain, Google Gemini, A2UI, Manufact and Daytona teams who shipped the underlying primitives.
 
 ## License
 
@@ -205,4 +308,6 @@ MIT.
 
 ---
 
-> Built for the Generative UI Global Hackathon: Agentic Interfaces.
+> **Built for the Generative UI Global Hackathon: Agentic Interfaces — Santiago, 9 May 2026.**
+> Sponsors: AI Tinkerers HQ · Google DeepMind · CopilotKit · Manufact
+> Built for the **Generative UI Global Hackathon — Agentic Interfaces** track. May 9, 2026.

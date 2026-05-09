@@ -1,126 +1,101 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Lead } from "@/lib/leads/types";
+import type { Resource, ResourceCategory } from "@/lib/leads/types";
+import { resourceCategoryClass } from "@/lib/leads/derive";
+import { useLocale } from "@/lib/i18n/context";
 
-interface WorkshopDemandProps {
-  leads: Lead[];
-  onPickWorkshop?: (workshop: string) => void;
-  selectedWorkshops?: string[];
-  /**
-   * `compact` shrinks the chart for inline-in-chat rendering: ~360px max
-   * width, smaller fonts, top 5 rows only. Use `false`/omit for the
-   * full-width canvas chart.
-   */
+export interface ResourceBarsProps {
+  resources: Resource[];
+  selectedCategories?: ResourceCategory[];
+  onPickCategory?: (cat: ResourceCategory) => void;
   compact?: boolean;
 }
 
-/**
- * Horizontal bar chart of leads-per-workshop.
- *
- * Same component renders inside the canvas (full width) AND inline in chat
- * via the `renderWorkshopDemand` controlled-gen-UI tool. The chat path passes
- * `compact` so the chart shrinks to fit the 420px sidebar.
- */
+interface CategoryAgg {
+  category: ResourceCategory;
+  have: number;
+  need: number;
+  pct: number;
+}
+
 export function WorkshopDemand({
-  leads,
-  onPickWorkshop,
-  selectedWorkshops,
+  resources,
+  selectedCategories,
+  onPickCategory,
   compact,
-}: WorkshopDemandProps) {
-  const rows = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const l of leads) {
-      const key = l.workshop?.trim() || "Not sure yet";
-      counts[key] = (counts[key] ?? 0) + 1;
+}: ResourceBarsProps) {
+  const { t } = useLocale();
+  const aggregates = useMemo<CategoryAgg[]>(() => {
+    const map = new Map<ResourceCategory, { have: number; need: number }>();
+    for (const r of resources) {
+      const cur = map.get(r.category) ?? { have: 0, need: 0 };
+      cur.have += r.have;
+      cur.need += r.need;
+      map.set(r.category, cur);
     }
-    return Object.entries(counts)
-      .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [leads]);
+    const out: CategoryAgg[] = [];
+    for (const [category, { have, need }] of map) {
+      const pct = need === 0 ? 100 : Math.min(100, Math.round((have / need) * 100));
+      out.push({ category, have, need, pct });
+    }
+    out.sort((a, b) => a.pct - b.pct);
+    return compact ? out.slice(0, 6) : out;
+  }, [resources, compact]);
 
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-        No leads loaded yet.
-      </div>
-    );
-  }
-
-  const visible = compact ? rows.slice(0, 6) : rows;
-  const max = Math.max(1, ...visible.map((r) => r.count));
-  const selected = new Set(selectedWorkshops ?? []);
+  const interactive = Boolean(onPickCategory);
 
   return (
-    <section
-      className={`flex h-full flex-col rounded-xl border border-border bg-card shadow-sm ${
-        compact ? "p-4" : "p-5"
-      }`}
-      aria-label="Workshop demand"
-    >
-      <header className="mb-3 flex items-baseline justify-between gap-3">
-        <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          workshop demand
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          {rows.length} workshops
-        </span>
-      </header>
-      <ul className={`flex flex-col ${compact ? "gap-1.5" : "gap-2"}`}>
-        {visible.map((row) => {
-          const pct = (row.count / max) * 100;
-          const isSelected = selected.has(row.label);
-          const interactive = Boolean(onPickWorkshop);
-          const RowEl = interactive ? "button" : "div";
-          return (
-            <li key={row.label}>
-              <RowEl
-                type={interactive ? "button" : undefined}
-                onClick={
-                  interactive ? () => onPickWorkshop?.(row.label) : undefined
-                }
-                className={`group grid w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition ${
-                  interactive ? "hover:bg-[#BEC2FF1A]" : ""
-                } ${
-                  compact
-                    ? "grid-cols-[120px_minmax(0,1fr)_32px]"
-                    : "grid-cols-[180px_minmax(0,1fr)_44px]"
-                }`}
-              >
-                <span
-                  className={`truncate text-foreground ${
-                    compact ? "text-[12px]" : "text-sm"
-                  }`}
-                  title={row.label}
-                >
-                  {row.label}
-                </span>
-                <span
-                  className={`relative h-2.5 overflow-hidden rounded-full bg-[#F0F0F4] ${
-                    compact ? "h-2" : ""
-                  }`}
-                  aria-hidden
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+        {t("resources.title")}
+      </div>
+      {aggregates.length === 0 ? (
+        <div className="mt-3 text-sm text-muted-foreground">—</div>
+      ) : (
+        <ul className="mt-3 grid gap-2">
+          {aggregates.map((a) => {
+            const isSelected = selectedCategories?.includes(a.category) ?? false;
+            const Row = interactive ? "button" : "div";
+            return (
+              <li key={a.category}>
+                <Row
+                  type={interactive ? ("button" as const) : undefined}
+                  onClick={
+                    interactive ? () => onPickCategory?.(a.category) : undefined
+                  }
+                  className={`flex w-full items-center gap-3 text-left ${
+                    interactive
+                      ? "rounded-md transition hover:bg-muted/40"
+                      : ""
+                  } ${isSelected ? "bg-muted/40" : ""}`}
                 >
                   <span
-                    className="absolute inset-y-0 left-0 rounded-full transition-all"
-                    style={{
-                      width: `${pct}%`,
-                      background: isSelected ? "#85ECCE" : "#BEC2FF",
-                    }}
-                  />
-                </span>
-                <span
-                  className={`text-right font-mono tabular-nums text-foreground ${
-                    compact ? "text-[11px]" : "text-xs"
-                  }`}
-                >
-                  {row.count}
-                </span>
-              </RowEl>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+                    className={`w-28 shrink-0 truncate rounded-full px-2 py-0.5 text-center text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${resourceCategoryClass(a.category)}`}
+                  >
+                    {t(`category.${a.category}`)}
+                  </span>
+                  <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`absolute inset-y-0 left-0 ${
+                        a.pct >= 100
+                          ? "bg-emerald-500"
+                          : a.pct >= 60
+                            ? "bg-amber-500"
+                            : "bg-rose-500"
+                      }`}
+                      style={{ width: `${a.pct}%` }}
+                    />
+                  </div>
+                  <span className="w-20 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                    {a.have}/{a.need}
+                  </span>
+                </Row>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
