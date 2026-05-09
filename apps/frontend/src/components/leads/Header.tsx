@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Crisis } from "@/lib/leads/types";
 import { useLocale } from "@/lib/i18n/context";
 import { LocaleToggle } from "@/components/LocaleToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface HeaderProps {
   title: string;
@@ -69,6 +70,7 @@ export function Header({
           </>
         )}
         <span className="text-txt-low">{user}</span>
+        <ThemeToggle />
         <LocaleToggle />
       </div>
     </header>
