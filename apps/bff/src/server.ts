@@ -1,15 +1,36 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import {
+  CopilotKitIntelligence,
   CopilotRuntime,
   createCopilotEndpoint,
 } from "@copilotkit/runtime/v2";
 import { LangGraphAgent } from "@copilotkit/runtime/langgraph";
 
-// Intelligence intentionally not wired: forces hand-off to ws://localhost:4403,
-// which remote clients (e.g. frontend partner via ngrok) cannot resolve.
-// Without it the runtime streams SSE through the same HTTP tunnel that already
-// works. Trade-off: no thread persistence (refresh = new conversation).
+// Intelligence wiring is conditional. Enable it (real thread persistence
+// backed by Postgres + Redis) by setting `INTELLIGENCE_ENABLED=1`.
+//
+// When OFF (default): the runtime is headless. Browsers can't connect to
+// `ws://localhost:4403` from a remote tunnel (ngrok / Cloud Run), so we
+// stream SSE through the BFF's HTTP tunnel and provide our own in-memory
+// PATCH/GET/DELETE for /api/copilotkit/threads/* below.
+//
+// When ON: the runtime delegates thread ops to the Intelligence service
+// at INTELLIGENCE_API_URL / INTELLIGENCE_GATEWAY_WS_URL. Use it for fully
+// local stacks where the browser can resolve the WS URL directly.
+const intelligenceEnabled =
+  process.env.INTELLIGENCE_ENABLED === "1" ||
+  process.env.INTELLIGENCE_ENABLED === "true";
+
+const intelligence = intelligenceEnabled
+  ? new CopilotKitIntelligence({
+      apiKey:
+        process.env.INTELLIGENCE_API_KEY ??
+        "cpk_sPRVSEED_seed0privat0longtoken00",
+      apiUrl: process.env.INTELLIGENCE_API_URL ?? "http://localhost:4203",
+      wsUrl: process.env.INTELLIGENCE_GATEWAY_WS_URL ?? "ws://localhost:4403",
+    })
+  : undefined;
 
 const agent = new LangGraphAgent({
   deploymentUrl:
@@ -26,7 +47,7 @@ const agent = new LangGraphAgent({
 const copilotApp = createCopilotEndpoint({
   basePath: "/api/copilotkit",
   runtime: new CopilotRuntime({
-    // intelligence,  // Headless demo — Cloud Run image legacy-services bug. Re-enable when fixed.
+    ...(intelligence && { intelligence }),
     identifyUser: () => ({ id: "default", name: "Hackathon User" }),
     licenseToken: process.env.COPILOTKIT_LICENSE_TOKEN,
     agents: { default: agent },
@@ -48,57 +69,58 @@ const copilotApp = createCopilotEndpoint({
 // CopilotKit runtime, so we can short-circuit problematic paths.
 const app = new Hono();
 
-// In-memory thread name store — survives while the process is alive.
-// Replaces the persistence layer that would normally come from
-// CopilotKitIntelligence (intentionally not wired here).
-const threadNames = new Map<string, string>();
-const threadCreatedAt = new Map<string, string>();
+// When Intelligence IS wired, it owns thread persistence (Postgres-backed).
+// When it's NOT wired (default), CopilotRuntime would 422 every thread op,
+// so we provide an in-memory fallback that survives while the process lives.
+if (!intelligenceEnabled) {
+  const threadNames = new Map<string, string>();
+  const threadCreatedAt = new Map<string, string>();
 
-const touchThread = (id: string, name?: string) => {
-  if (name !== undefined) threadNames.set(id, name);
-  if (!threadCreatedAt.has(id)) {
-    threadCreatedAt.set(id, new Date().toISOString());
-  }
-};
+  const touchThread = (id: string, name?: string) => {
+    if (name !== undefined) threadNames.set(id, name);
+    if (!threadCreatedAt.has(id)) {
+      threadCreatedAt.set(id, new Date().toISOString());
+    }
+  };
 
-const serializeThread = (id: string) => ({
-  id,
-  name: threadNames.get(id) ?? "",
-  agentId: "default",
-  createdAt: threadCreatedAt.get(id) ?? new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
+  const serializeThread = (id: string) => ({
+    id,
+    name: threadNames.get(id) ?? "",
+    agentId: "default",
+    createdAt: threadCreatedAt.get(id) ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
 
-// PATCH /api/copilotkit/threads/:id — rename a thread.
-// Body: {"name": "string"} → 200 {id, name, agentId, createdAt, updatedAt}
-app.patch("/api/copilotkit/threads/:id", async (c) => {
-  const id = c.req.param("id");
-  const body = await c.req.json().catch(() => ({}));
-  const name = body?.name;
-  if (typeof name !== "string" || !name.trim()) {
-    return c.json({ error: "Missing or invalid `name` in body" }, 400);
-  }
-  touchThread(id, name.trim());
-  return c.json(serializeThread(id), 200);
-});
+  // PATCH /api/copilotkit/threads/:id — rename a thread.
+  // Body: {"name": "string"} → 200 {id, name, agentId, createdAt, updatedAt}
+  app.patch("/api/copilotkit/threads/:id", async (c) => {
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const name = body?.name;
+    if (typeof name !== "string" || !name.trim()) {
+      return c.json({ error: "Missing or invalid `name` in body" }, 400);
+    }
+    touchThread(id, name.trim());
+    return c.json(serializeThread(id), 200);
+  });
 
-// DELETE /api/copilotkit/threads/:id — remove from the local store.
-// CopilotRuntime would 422 here too without Intelligence; same workaround.
-app.delete("/api/copilotkit/threads/:id", (c) => {
-  const id = c.req.param("id");
-  threadNames.delete(id);
-  threadCreatedAt.delete(id);
-  return c.json({ id, deleted: true }, 200);
-});
+  // DELETE /api/copilotkit/threads/:id — remove from the local store.
+  app.delete("/api/copilotkit/threads/:id", (c) => {
+    const id = c.req.param("id");
+    threadNames.delete(id);
+    threadCreatedAt.delete(id);
+    return c.json({ id, deleted: true }, 200);
+  });
 
-// GET /api/copilotkit/threads?agentId=default — list threads with rename
-// applied. Filter by agentId when present.
-app.get("/api/copilotkit/threads", (c) => {
-  const agentId = c.req.query("agentId");
-  if (agentId && agentId !== "default") return c.json({ threads: [] }, 200);
-  const threads = Array.from(threadNames.keys()).map(serializeThread);
-  return c.json({ threads }, 200);
-});
+  // GET /api/copilotkit/threads?agentId=default — list threads with rename
+  // applied. Filter by agentId when present.
+  app.get("/api/copilotkit/threads", (c) => {
+    const agentId = c.req.query("agentId");
+    if (agentId && agentId !== "default") return c.json({ threads: [] }, 200);
+    const threads = Array.from(threadNames.keys()).map(serializeThread);
+    return c.json({ threads }, 200);
+  });
+}
 
 // Some CopilotKit clients probe the runtime base path before hitting
 // /agent/:id/run. The v2 runtime registers .all("*") for /api/copilotkit
