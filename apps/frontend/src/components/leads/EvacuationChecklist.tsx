@@ -1,142 +1,123 @@
 "use client";
 
 import { useMemo } from "react";
-import { Check } from "lucide-react";
 import type { ChecklistItem, ChecklistPriority } from "@/lib/leads/types";
-import { CHECKLIST_PRIORITIES } from "@/lib/leads/types";
-import { checklistProgress } from "@/lib/leads/derive";
 import { useLocale } from "@/lib/i18n/context";
+import { PriorityChip } from "@/components/ui/priority-chip";
+import { StatusChip } from "@/components/ui/status-chip";
 
 export interface EvacuationChecklistProps {
   items: ChecklistItem[];
   onToggle: (itemId: string) => void;
 }
 
-const PRIORITY_COLOR: Record<ChecklistPriority, string> = {
-  immediate: "bg-rose-500",
-  "short-term": "bg-amber-500",
-  "long-term": "bg-emerald-500",
+const PRIORITY_TO_CHIP: Record<ChecklistPriority, "urgent" | "high" | "med"> = {
+  immediate: "urgent",
+  "short-term": "high",
+  "long-term": "med",
 };
 
-const PRIORITY_KEY: Record<ChecklistPriority, string> = {
-  immediate: "priority.immediate",
-  "short-term": "priority.short",
-  "long-term": "priority.long",
-};
-
-export function EvacuationChecklist({
-  items,
-  onToggle,
-}: EvacuationChecklistProps) {
+export function EvacuationChecklist({ items, onToggle }: EvacuationChecklistProps) {
   const { t } = useLocale();
-  const progress = useMemo(() => checklistProgress(items), [items]);
 
-  const grouped = useMemo(() => {
-    const map: Record<string, ChecklistItem[]> = {};
-    for (const p of CHECKLIST_PRIORITIES) map[p] = [];
+  const boards = useMemo(() => {
+    const map = new Map<string, ChecklistItem[]>();
     for (const i of items) {
-      (map[i.priority] ||= []).push(i);
+      const key = (i.category && i.category.trim()) || i.priority;
+      const list = map.get(key);
+      if (list) list.push(i);
+      else map.set(key, [i]);
     }
-    return map;
+    return Array.from(map.entries()).map(([key, list]) => ({ key, items: list }));
   }, [items]);
 
   if (items.length === 0) {
     return (
-      <div className="flex w-full items-center justify-center text-sm text-muted-foreground">
-        —
-      </div>
+      <div className="flex w-full items-center justify-center text-sm text-txt-low">—</div>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-4">
-      <div className="rounded-xl border border-border bg-background p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-              {t("checklist.progress")}
-            </div>
-            <div className="text-2xl font-semibold text-foreground">
-              {progress.done} / {progress.total}{" "}
-              <span className="text-sm font-normal text-muted-foreground">
-                ({progress.pct}%)
-              </span>
-            </div>
-          </div>
-          <div className="text-right font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            {t("checklist.title")}
-          </div>
-        </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full bg-emerald-500 transition-all"
-            style={{ width: `${progress.pct}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {CHECKLIST_PRIORITIES.map((priority) => {
-          const phaseItems = grouped[priority] ?? [];
-          return (
-            <section
-              key={priority}
-              className="rounded-xl border border-border bg-background p-3"
-            >
-              <header className="flex items-center gap-2 pb-2">
-                <span className={`size-2 rounded-full ${PRIORITY_COLOR[priority]}`} />
-                <span className="text-sm font-semibold text-foreground">
-                  {t(PRIORITY_KEY[priority])}
-                </span>
-                <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-                  {phaseItems.filter((i) => i.checked).length}/{phaseItems.length}
-                </span>
-              </header>
-              {phaseItems.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("checklist.empty.section")}</p>
-              ) : (
-                <ul className="grid gap-1.5">
-                  {phaseItems.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => onToggle(item.id)}
-                        className="group flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-muted/40"
-                      >
-                        <span
-                          className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition ${
-                            item.checked
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : "border-muted-foreground/40 group-hover:border-foreground"
-                          }`}
-                        >
-                          {item.checked ? <Check className="size-3" /> : null}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={
-                              item.checked
-                                ? "block text-muted-foreground line-through"
-                                : "block text-foreground"
-                            }
-                          >
-                            {item.text}
-                          </span>
-                          {item.category ? (
-                            <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                              {item.category}
-                            </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })}
-      </div>
+    <div className="grid w-full auto-rows-min gap-6 md:grid-cols-2">
+      {boards.map((b) => (
+        <Board key={b.key} title={titleize(b.key)} items={b.items} onToggle={onToggle} t={t} />
+      ))}
     </div>
   );
+}
+
+function Board({
+  title,
+  items,
+  onToggle,
+  t,
+}: {
+  title: string;
+  items: ChecklistItem[];
+  onToggle: (id: string) => void;
+  t: (key: string) => string;
+}) {
+  const done = items.filter((i) => i.checked).length;
+  const total = items.length;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  const status = done === total ? "done" : done === 0 ? "pending" : "in-progress";
+  const barColor =
+    status === "done" ? "bg-emerald-500" : status === "pending" ? "bg-zinc-700" : "bg-brand";
+
+  return (
+    <section className="border border-line bg-bg-2">
+      <header className="flex items-center justify-between border-b border-line px-4 py-3">
+        <div>
+          <div className="text-sm font-semibold text-txt-hi">{title}</div>
+          <div className="font-mono text-[11px] text-txt-low">
+            {done} / {total} {t("checklist.actions") || "actions"}
+          </div>
+        </div>
+        <StatusChip status={status} />
+      </header>
+      <div className="h-1 bg-bg-3">
+        <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+      <ul className="divide-y divide-line">
+        {items.map((item) => {
+          const chip = PRIORITY_TO_CHIP[item.priority];
+          const isUrgent = chip === "urgent" && !item.checked;
+          return (
+            <li
+              key={item.id}
+              className={`flex items-center gap-3 px-4 py-2.5 text-sm ${
+                isUrgent ? "bg-amber-500/5" : ""
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={item.checked}
+                onChange={() => onToggle(item.id)}
+                className="accent-brand size-4 shrink-0 cursor-pointer"
+              />
+              <span
+                className={`min-w-0 flex-1 ${
+                  item.checked ? "text-txt-low line-through" : "text-txt-mid"
+                }`}
+              >
+                {item.text}
+              </span>
+              {item.checked ? (
+                <StatusChip status="done" />
+              ) : (
+                <PriorityChip priority={chip} />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function titleize(key: string): string {
+  return key
+    .split(/[-_\s]/)
+    .map((p) => (p ? p[0].toUpperCase() + p.slice(1) : p))
+    .join(" ");
 }
