@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { CopilotKitProviderShell } from "@/components/copilot/CopilotKitProviderShell";
@@ -28,6 +28,13 @@ export const metadata: Metadata = {
   title: "CrisisOS — generative war-room",
   description:
     "CrisisOS — generative UI workspace for emergency management. Map, evac checklist, resources, alerts, timeline assembled in real time.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 const themeBootstrap = `

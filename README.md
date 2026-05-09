@@ -3,35 +3,11 @@
 > **Generative UI war-room for emergency response.**
 > Describe a disaster in chat. AI builds you a live operations canvas in seconds.
 
-![hackathon](https://img.shields.io/badge/Generative_UI_Hackathon-Agentic_Interfaces-7c3aed)
-![built](https://img.shields.io/badge/Built_in-6h-orange)
-![license](https://img.shields.io/badge/license-MIT-green)
-![next](https://img.shields.io/badge/Next.js-15-black)
-![react](https://img.shields.io/badge/React-19-61dafb)
-![langgraph](https://img.shields.io/badge/LangGraph-Gemini-4285f4)
-![copilotkit](https://img.shields.io/badge/CopilotKit-v2-ff6b6b)
-
-<!-- TODO: replace with real hero GIF (docs/hero.gif) once demo is recorded -->
 <p align="center">
-  <img src="apps/frontend/public/banner.jpg" alt="CrisisOS hero — placeholder" width="780" />
-  <br/>
-  <em>Hero GIF placeholder — record once backend is wired and replace.</em>
+  <img src="apps/frontend/public/banner.jpg" alt="CrisisOS hero" width="780" />
 </p>
 
-**[ Demo video — TODO ] · [Repo](https://github.com/franciscogar94/CrisisOS) · [Hackathon submission — TODO ]**
-
----
-
-## Demo
-
-<!-- TODO: upload 90-120s demo video to a GitHub comment, copy the user-attachments URL, paste here. -->
-
-> 📹 **Demo video coming.** 90-second walkthrough: type "Earthquake magnitude 7.2 in Santiago" → watch the canvas paint a Leaflet map with safe zones, an evacuation checklist, resource inventory, alerts and a live timeline — all in one shot.
-
-<p align="center">
-  <em>[ screenshot — light mode — TODO docs/screenshot-light.png ]</em><br/>
-  <em>[ screenshot — dark mode — TODO docs/screenshot-dark.png ]</em>
-</p>
+**Demo video:** _TODO — paste URL here_
 
 ---
 
@@ -125,7 +101,7 @@ Hackathon rules require declaring what was built during the build window vs what
 - `notion_tools.py` rewritten as crisis tools: `generate_crisis`, `fetch_weather` (Open-Meteo), `generate_timeline`
 - `canvas.py` — frontend tool docstrings for the agent
 
-### ♻️ Inherited from CopilotKit's [Agentic Interfaces Starter Kit](https://github.com/CopilotKit/agentic-interfaces-starter)
+### ♻️ Inherited from CopilotKit's Agentic Interfaces Starter Kit
 
 - CopilotKit v2 runtime + Intelligence (durable Postgres-backed threads)
 - Hono BFF scaffolding
@@ -150,28 +126,26 @@ We removed the starter's Notion lead-form demo, A2UI streaming, MCP App scaffold
 
 ## Run locally
 
-**Requirements:** Node 20+, Python 3.11+, [`uv`](https://docs.astral.sh/uv/), Docker.
+**Requirements:** Node 20+, Python 3.11+, `uv`, Docker.
 
 ```bash
-git clone https://github.com/franciscogar94/CrisisOS
-cd CrisisOS
 npm install
 cp .env.example .env
-# paste GEMINI_API_KEY into .env  (https://aistudio.google.com)
+# paste GEMINI_API_KEY into .env
 npm run dev
 ```
 
-`npm run dev` runs `scripts/check-env.sh` first — it fails loudly with a numbered list if anything's missing, then boots Docker (Postgres + Redis), the Next.js UI, the Hono BFF and the LangGraph agent in one shot.
+`npm run dev` runs `scripts/check-env.sh` first — fails loudly with numbered list if anything's missing, then boots Docker (Postgres + Redis), Next.js UI, Hono BFF and LangGraph agent in one shot.
 
-Open `http://localhost:3000`, type a crisis prompt.
+Open `localhost:3000`, type a crisis prompt.
 
-> Need to swap models or run without Docker? See [`dev-docs/setup.md`](dev-docs/setup.md) and [`dev-docs/model-switching.md`](dev-docs/model-switching.md).
+> Swap models or run without Docker: see `dev-docs/setup.md` and `dev-docs/model-switching.md`.
 
 ---
 
 ## Team — Tesla Model 3
 
-- **francisco** ([@franciscogar94](https://github.com/franciscogar94)) — frontend (`apps/frontend/`)
+- **francisco** — frontend (`apps/frontend/`)
 - **mgrddev** — agent (`apps/agent/`)
 
 Both pair-programming with Claude Code throughout the build.

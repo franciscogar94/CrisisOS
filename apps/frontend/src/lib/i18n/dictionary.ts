@@ -101,6 +101,19 @@ const en: Dict = {
   "resources.need": "Need",
   "resources.gap": "Gap",
   "resources.critical": "CRITICAL",
+  "threads.title": "THREADS",
+  "threads.new": "+ NEW CHAT",
+  "threads.loading": "loading…",
+  "threads.empty": "no threads",
+  "threads.untitled": "Untitled",
+  "threads.load_more": "load more",
+  "threads.delete_aria": "delete thread",
+  "threads.delete_confirm": "Delete \"{name}\"?",
+  "threads.close_aria": "close threads",
+  "threads.relative.now": "now",
+  "threads.relative.minutes": "{n}m",
+  "threads.relative.hours": "{n}h",
+  "threads.relative.days": "{n}d",
 };
 
 const es: Dict = {
@@ -200,6 +213,19 @@ const es: Dict = {
   "resources.need": "Falta",
   "resources.gap": "Brecha",
   "resources.critical": "CRÍTICO",
+  "threads.title": "CONVERSACIONES",
+  "threads.new": "+ NUEVO CHAT",
+  "threads.loading": "cargando…",
+  "threads.empty": "sin conversaciones",
+  "threads.untitled": "Sin título",
+  "threads.load_more": "ver más",
+  "threads.delete_aria": "eliminar conversación",
+  "threads.delete_confirm": "¿Eliminar \"{name}\"?",
+  "threads.close_aria": "cerrar conversaciones",
+  "threads.relative.now": "ahora",
+  "threads.relative.minutes": "{n}m",
+  "threads.relative.hours": "{n}h",
+  "threads.relative.days": "{n}d",
 };
 
 export const dictionaries: Record<Locale, Dict> = { en, es };

@@ -189,8 +189,8 @@ export function CrisisMap({
         ))}
       </MapContainer>
 
-      {/* Legend (top-left) */}
-      <div className="pointer-events-auto absolute left-4 top-4 z-[400] space-y-1.5 border border-line bg-bg-2/90 p-3 font-mono text-xs backdrop-blur-sm">
+      {/* Legend (top-left, hidden on mobile to save space) */}
+      <div className="pointer-events-auto absolute left-2 top-2 z-[400] hidden space-y-1.5 border border-line bg-bg-2/90 p-3 font-mono text-xs backdrop-blur-sm sm:block sm:left-4 sm:top-4">
         <div className="mb-2 tracking-[0.2em] text-txt-low">LEGEND</div>
         <LegendRow color="bg-red-500" label="Danger" />
         <LegendRow color="bg-amber-500" label="Evac" />
@@ -198,23 +198,23 @@ export function CrisisMap({
         <LegendRow color="bg-sky-500" label="Resource" />
       </div>
 
-      {/* Search (top-right) */}
-      <div className="pointer-events-auto absolute right-4 top-4 z-[400] flex w-72 items-center gap-2 border border-line bg-bg-2/90 px-3 py-2 text-xs backdrop-blur-sm">
+      {/* Search (top, full-width mobile / right desktop) */}
+      <div className="pointer-events-auto absolute left-2 right-2 top-2 z-[400] flex items-center gap-2 border border-line bg-bg-2/90 px-3 py-2 text-xs backdrop-blur-sm sm:left-auto sm:right-4 sm:top-4 sm:w-72">
         <span className="text-txt-low">⌕</span>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-transparent text-txt-mid outline-none placeholder:text-txt-low"
-          placeholder="Search address, zone, resource…"
+          className="flex-1 bg-transparent text-base text-txt-mid outline-none placeholder:text-txt-low sm:text-xs"
+          placeholder="Search…"
         />
-        <span className="rounded-sm border border-line border-b-2 px-1.5 font-mono text-[10px] text-txt-low">
+        <span className="hidden rounded-sm border border-line border-b-2 px-1.5 font-mono text-[10px] text-txt-low sm:inline">
           /
         </span>
       </div>
 
-      {/* Mini stats (bottom-left) */}
+      {/* Mini stats (bottom, full-width mobile) */}
       {crisis ? (
-        <div className="pointer-events-auto absolute bottom-4 left-4 z-[400] grid grid-cols-4 divide-x divide-line border border-line bg-bg-2/95 backdrop-blur-sm">
+        <div className="pointer-events-auto absolute bottom-2 left-2 right-2 z-[400] grid grid-cols-4 divide-x divide-line border border-line bg-bg-2/95 backdrop-blur-sm sm:bottom-4 sm:left-4 sm:right-auto sm:w-auto">
           <Stat
             label="AFFECTED"
             value={fmt(affectedCount)}
@@ -238,13 +238,19 @@ export function CrisisMap({
         </div>
       ) : null}
 
-      {/* Recenter (bottom-right) */}
+      {/* Recenter (bottom-right, hidden on mobile when stats present) */}
       <button
         type="button"
         onClick={handleRecenter}
-        className="pointer-events-auto absolute bottom-4 right-4 z-[400] border border-line-strong bg-bg-2 px-3 py-2 font-mono text-xs uppercase tracking-[0.12em] text-txt-mid transition hover:border-brand hover:text-txt-hi"
+        aria-label="recenter map"
+        className={`pointer-events-auto absolute z-[400] border border-line-strong bg-bg-2 font-mono text-xs uppercase tracking-[0.12em] text-txt-mid transition hover:border-brand hover:text-txt-hi ${
+          crisis
+            ? "right-2 top-14 size-10 sm:right-4 sm:top-auto sm:bottom-4 sm:size-auto sm:px-3 sm:py-2"
+            : "right-2 bottom-2 size-10 sm:right-4 sm:bottom-4 sm:size-auto sm:px-3 sm:py-2"
+        }`}
       >
-        ⊕ RECENTER
+        <span className="sm:hidden">⊕</span>
+        <span className="hidden sm:inline">⊕ RECENTER</span>
       </button>
     </div>
   );
@@ -261,9 +267,11 @@ function LegendRow({ color, label }: { color: string; label: string }) {
 
 function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className="px-3 py-2 font-mono">
-      <div className="text-[10px] tracking-[0.2em] text-txt-low">{label}</div>
-      <div className={`text-xl font-bold ${tone}`}>{value}</div>
+    <div className="min-w-0 px-2 py-1.5 font-mono sm:px-3 sm:py-2">
+      <div className="truncate text-[9px] tracking-[0.2em] text-txt-low sm:text-[10px]">
+        {label}
+      </div>
+      <div className={`truncate text-sm font-bold sm:text-xl ${tone}`}>{value}</div>
     </div>
   );
 }

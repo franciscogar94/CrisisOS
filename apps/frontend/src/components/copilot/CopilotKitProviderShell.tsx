@@ -15,16 +15,23 @@
  * surfaces as a small CopilotKit-branded card. No registry needed here.
  */
 
+import { useEffect } from "react";
 import { CopilotKitProvider } from "@copilotkit/react-core/v2";
+import { installFetchLogger } from "@/lib/fetch-logger";
 
 export function CopilotKitProviderShell({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  useEffect(() => {
+    installFetchLogger();
+  }, []);
+
   return (
     <CopilotKitProvider
       runtimeUrl="/api/copilotkit"
+      headers={{ "ngrok-skip-browser-warning": "1" }}
       publicApiKey={process.env.NEXT_PUBLIC_COPILOT_CLOUD_PUBLIC_API_KEY}
       openGenerativeUI={{}}
     >
