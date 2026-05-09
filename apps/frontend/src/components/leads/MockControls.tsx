@@ -13,12 +13,12 @@ export function MockControls(props: Props) {
   const { t } = useLocale();
   if (props.active) {
     return (
-      <div className="flex items-center gap-2 rounded-sm border border-amber-500/40 bg-amber-950/30 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-amber-300">
+      <div className="flex items-center gap-2 rounded-sm border border-amber-500/40 bg-amber-50 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
         <span className="font-semibold">{t("mock.loaded")}</span>
         <button
           type="button"
           onClick={props.onClear}
-          className="ml-2 rounded-sm border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-200 hover:bg-amber-500/20"
+          className="ml-2 rounded-sm border border-amber-500/40 bg-amber-100 px-2 py-0.5 font-semibold text-amber-900 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
         >
           {t("mock.clear")}
         </button>

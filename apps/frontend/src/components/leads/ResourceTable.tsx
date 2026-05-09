@@ -73,9 +73,24 @@ export function ResourceTable({ resources, onUpdateHave }: ResourceTableProps) {
       {/* Stat tiles */}
       <div className="grid grid-cols-2 divide-x divide-line border-b border-line md:grid-cols-4">
         <Tile label="TOTAL" value={String(resources.length)} tone="text-txt-hi" hint="tracked" />
-        <Tile label="STOCKED" value={String(fullyStocked)} tone="text-emerald-400" hint="have ≥ need" />
-        <Tile label="PARTIAL" value={String(partial)} tone="text-amber-400" hint="filling" />
-        <Tile label="CRITICAL" value={String(criticalShort)} tone="text-red-400" hint="urgent" />
+        <Tile
+          label="STOCKED"
+          value={String(fullyStocked)}
+          tone="text-emerald-700 dark:text-emerald-400"
+          hint="have ≥ need"
+        />
+        <Tile
+          label="PARTIAL"
+          value={String(partial)}
+          tone="text-amber-700 dark:text-amber-400"
+          hint="filling"
+        />
+        <Tile
+          label="CRITICAL"
+          value={String(criticalShort)}
+          tone="text-red-700 dark:text-red-400"
+          hint="urgent"
+        />
       </div>
 
       {/* Table */}
@@ -173,7 +188,9 @@ function ResourceRow({
   return (
     <tr className="hover:bg-bg-3/40">
       <td className={`px-5 py-3 ${isOffline ? "text-txt-low" : "text-txt-hi"}`}>
-        {resource.critical ? <span className="mr-1.5 text-red-400">●</span> : null}
+        {resource.critical ? (
+          <span className="mr-1.5 text-red-600 dark:text-red-400">●</span>
+        ) : null}
         {resource.name}
       </td>
       <td className="px-3 py-3 text-txt-mid">{resource.category}</td>
@@ -200,7 +217,7 @@ function ResourceRow({
           <button
             type="button"
             onClick={recall}
-            className="text-[11px] font-semibold tracking-[0.12em] text-amber-400 hover:text-amber-300"
+            className="text-[11px] font-semibold tracking-[0.12em] text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
           >
             RECALL
           </button>
@@ -208,7 +225,7 @@ function ResourceRow({
           <button
             type="button"
             onClick={deploy}
-            className="text-[11px] font-semibold tracking-[0.12em] text-brand hover:text-brand-3"
+            className="text-[11px] font-semibold tracking-[0.12em] text-brand hover:text-brand-2 dark:hover:text-brand-3"
           >
             DEPLOY ›
           </button>

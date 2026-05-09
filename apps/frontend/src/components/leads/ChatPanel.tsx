@@ -62,14 +62,26 @@ export function ChatPanel() {
       {/* Header */}
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4 font-mono text-xs">
         <span className="tracking-[0.24em] text-txt-low">// COPILOT</span>
-        {isRunning ? (
-          <span className="inline-flex items-center gap-1.5 text-emerald-400">
-            <span className="inline-block size-1.5 animate-pulse rounded-full bg-emerald-400" />
-            streaming
-          </span>
-        ) : (
-          <span className="text-txt-low">idle</span>
-        )}
+        <div className="flex items-center gap-3">
+          {!empty ? (
+            <button
+              type="button"
+              onClick={() => agent?.setMessages([])}
+              className="text-txt-low transition hover:text-txt-hi"
+              title="Start a new conversation"
+            >
+              + NUEVO
+            </button>
+          ) : null}
+          {isRunning ? (
+            <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+              <span className="inline-block size-1.5 animate-pulse rounded-full bg-emerald-500" />
+              streaming
+            </span>
+          ) : (
+            <span className="text-txt-low">idle</span>
+          )}
+        </div>
       </div>
 
       {/* Messages / suggestions */}

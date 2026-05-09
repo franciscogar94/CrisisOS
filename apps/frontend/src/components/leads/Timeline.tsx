@@ -56,8 +56,12 @@ export function Timeline({ entries, onToggle }: TimelineProps) {
         {sorted.map((e, idx) => {
           const isCritical = idx === sorted.length - 1 && e.phase === "first_5_min";
           const dotTone = isCritical ? "bg-red-500" : PHASE_TONE[e.phase];
-          const phaseLabelTone = isCritical ? "text-red-400" : "text-txt-low";
-          const cardBorder = isCritical ? "border-red-500/40 bg-red-500/5" : "border-line hover:border-brand/60";
+          const phaseLabelTone = isCritical
+            ? "text-red-700 dark:text-red-400"
+            : "text-txt-low";
+          const cardBorder = isCritical
+            ? "border-red-500/40 bg-red-50 dark:bg-red-500/5"
+            : "border-line hover:border-brand/60";
           return (
             <li key={e.id} className="flex items-start gap-5">
               <div

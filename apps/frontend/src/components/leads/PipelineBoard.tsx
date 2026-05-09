@@ -129,12 +129,20 @@ function tabCounts(state: AgentState): Record<ActiveModule, { label: string; ton
     overview: null,
     map: null,
     checklist: checklistTotal
-      ? { label: `${checklistDone}/${checklistTotal}`, tone: "text-emerald-400" }
+      ? {
+          label: `${checklistDone}/${checklistTotal}`,
+          tone: "text-emerald-700 dark:text-emerald-400",
+        }
       : null,
     resources: resourceTotal ? { label: String(resourceTotal), tone: "text-txt-low" } : null,
     timeline: null,
     alerts: alertTotal
-      ? { label: String(alertTotal), tone: alertCritical ? "text-red-400" : "text-txt-low" }
+      ? {
+          label: String(alertTotal),
+          tone: alertCritical
+            ? "text-red-700 dark:text-red-400"
+            : "text-txt-low",
+        }
       : null,
   };
 }
@@ -179,14 +187,26 @@ function OverviewModule({ state }: { state: AgentState }) {
         </dl>
       </div>
       <div className="grid grid-cols-2 gap-2 self-start">
-        <KPI label="ZONES OPEN" value={String(openZones.length)} tone="text-emerald-400" />
+        <KPI
+          label="ZONES OPEN"
+          value={String(openZones.length)}
+          tone="text-emerald-700 dark:text-emerald-400"
+        />
         <KPI
           label="CHECKLIST"
           value={`${checklistDone}/${checklist.length}`}
           tone="text-brand"
         />
-        <KPI label="OUTAGES" value={String(outageAlerts.length)} tone="text-red-400" />
-        <KPI label="CRITICAL RES" value={String(criticalRes)} tone="text-amber-400" />
+        <KPI
+          label="OUTAGES"
+          value={String(outageAlerts.length)}
+          tone="text-red-700 dark:text-red-400"
+        />
+        <KPI
+          label="CRITICAL RES"
+          value={String(criticalRes)}
+          tone="text-amber-700 dark:text-amber-400"
+        />
       </div>
 
       <div className="border border-line bg-bg p-4 lg:col-span-2">
