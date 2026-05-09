@@ -1,54 +1,56 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  /* War-room dark surfaces */
-  --bg: #0a0d0a;
-  --bg-2: #0d110d;
-  --bg-3: #121712;
-  --line: #1f261f;
-  --line-strong: #3a4538;
+  /* Light mode — paper white surfaces */
+  --bg: #ffffff;
+  --bg-2: #f6f6f2;
+  --bg-3: #ececea;
+  --line: #e2e2dc;
+  --line-strong: #c5c5be;
 
   /* Text */
-  --txt-hi: #f4f4ef;
-  --txt-mid: #a3a89c;
-  --txt-low: #6f7468;
+  --txt-hi: #0a0d0a;
+  --txt-mid: #46493f;
+  --txt-low: #7c8076;
 
-  /* Sage brand */
-  --brand: #9caa90;
-  --brand-2: #6b7a64;
-  --brand-3: #c4cdb9;
+  /* Sage brand — darker for contrast on white */
+  --brand: #6b7a64;
+  --brand-2: #4f5b4a;
+  --brand-3: #9caa90;
 
-  /* Severity */
+  /* Severity (shared across modes) */
   --critical: #ef4444;
   --critical-2: #7f1d1d;
   --warning: #f59e0b;
   --warning-2: #78350f;
   --safe: #10b981;
   --safe-2: #064e3b;
-  --info: #38bdf8;
+  --info: #0ea5e9;
   --info-2: #075985;
 
-  /* shadcn token shim — names locked, hex re-pointed to dark sage */
+  /* shadcn token shim — names locked, mapped to current mode */
   --background: var(--bg);
   --foreground: var(--txt-hi);
   --card: var(--bg-2);
   --card-foreground: var(--txt-hi);
-  --popover: var(--bg-2);
+  --popover: var(--bg);
   --popover-foreground: var(--txt-hi);
   --primary: var(--brand);
-  --primary-foreground: #0a0d0a;
+  --primary-foreground: #ffffff;
   --secondary: var(--bg-3);
   --secondary-foreground: var(--txt-hi);
   --muted: var(--bg-3);
   --muted-foreground: var(--txt-mid);
   --accent: var(--brand);
-  --accent-foreground: #0a0d0a;
+  --accent-foreground: #ffffff;
   --destructive: var(--critical);
   --destructive-foreground: #ffffff;
   --border: var(--line);
-  --input: var(--bg-2);
-  --ring: rgba(156, 170, 144, 0.6);
+  --input: var(--bg);
+  --ring: rgba(107, 122, 100, 0.45);
   --chart-1: var(--brand);
   --chart-2: var(--safe);
   --chart-3: var(--info);
@@ -58,10 +60,37 @@
   --sidebar: var(--bg-2);
   --sidebar-foreground: var(--txt-hi);
   --sidebar-primary: var(--brand);
-  --sidebar-primary-foreground: #0a0d0a;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--bg-3);
   --sidebar-accent-foreground: var(--txt-hi);
   --sidebar-border: var(--line);
+  --sidebar-ring: rgba(107, 122, 100, 0.45);
+}
+
+.dark {
+  /* War-room dark surfaces */
+  --bg: #0a0d0a;
+  --bg-2: #0d110d;
+  --bg-3: #121712;
+  --line: #1f261f;
+  --line-strong: #3a4538;
+
+  --txt-hi: #f4f4ef;
+  --txt-mid: #a3a89c;
+  --txt-low: #6f7468;
+
+  --brand: #9caa90;
+  --brand-2: #6b7a64;
+  --brand-3: #c4cdb9;
+
+  --info: #38bdf8;
+
+  --primary-foreground: #0a0d0a;
+  --accent-foreground: #0a0d0a;
+  --popover: var(--bg-2);
+  --input: var(--bg-2);
+  --ring: rgba(156, 170, 144, 0.6);
+  --sidebar-primary-foreground: #0a0d0a;
   --sidebar-ring: rgba(156, 170, 144, 0.6);
 }
 
