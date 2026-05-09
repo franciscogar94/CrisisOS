@@ -43,8 +43,10 @@ import { EmailDraftCard } from "@/components/leads/inline/EmailDraftCard";
 import { MockControls } from "@/components/leads/MockControls";
 import { ToolFallbackCard } from "@/components/copilot/ToolFallbackCard";
 import { ThreadsPanel } from "@/components/leads/ThreadsPanel";
+import { geminiTransport } from "@/lib/leads/chat-transport";
 
 const MOCK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK === "1";
+const GEMINI_DIRECT = process.env.NEXT_PUBLIC_DEMO_MODE === "gemini";
 
 const MockOverrideContext = createContext<{
   mockOverride: AgentState | null;
@@ -654,6 +656,10 @@ function CanvasBody({
             <ChatPanel
               onBack={onBack}
               onCloseMobile={() => setMobileView("canvas")}
+              transport={GEMINI_DIRECT ? geminiTransport : undefined}
+              currentState={GEMINI_DIRECT ? state : undefined}
+              onApplyState={GEMINI_DIRECT ? (next) => setMockOverride?.(next) : undefined}
+              locale={locale}
             />
           </div>
           <section

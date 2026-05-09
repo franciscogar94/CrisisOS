@@ -8,6 +8,8 @@ import {
   useSuggestions,
   useThreads,
 } from "@copilotkit/react-core/v2";
+import type { AgentState } from "@/lib/leads/types";
+import type { ChatMessage, ChatTransport } from "@/lib/leads/chat-transport";
 
 const INITIALS_KEY = "crisisos.userInitials";
 const DEFAULT_INITIALS = "YO";
@@ -23,7 +25,18 @@ function normalizeInitials(value: string): string {
 export function ChatPanel({
   onBack,
   onCloseMobile,
-}: { onBack?: () => void; onCloseMobile?: () => void } = {}) {
+  transport,
+  currentState,
+  onApplyState,
+  locale = "es",
+}: {
+  onBack?: () => void;
+  onCloseMobile?: () => void;
+  transport?: ChatTransport;
+  currentState?: AgentState | null;
+  onApplyState?: (next: AgentState) => void;
+  locale?: "en" | "es";
+} = {}) {
   const { agent } = useAgent({
     updates: [UseAgentUpdate.OnMessagesChanged, UseAgentUpdate.OnRunStatusChanged],
   });
@@ -31,6 +44,11 @@ export function ChatPanel({
   const [draft, setDraft] = useState("");
   const [initials, setInitials] = useState(DEFAULT_INITIALS);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+  const [localRunning, setLocalRunning] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const useLocal = transport !== undefined;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -54,8 +72,21 @@ export function ChatPanel({
     content?: string | unknown;
     toolCalls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
   }>;
-  const isRunning = agent?.isRunning ?? false;
-  const visible = messages.filter((m) => m.role === "user" || m.role === "assistant");
+  const remoteVisible = messages.filter((m) => m.role === "user" || m.role === "assistant");
+  const visible: Array<{
+    id: string;
+    role: "user" | "assistant";
+    content?: string | unknown;
+    toolCalls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
+  }> = useLocal
+    ? localMessages.map((m) => ({ id: m.id, role: m.role, content: m.text }))
+    : (remoteVisible as Array<{
+        id: string;
+        role: "user" | "assistant";
+        content?: string | unknown;
+        toolCalls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
+      }>);
+  const isRunning = useLocal ? localRunning : (agent?.isRunning ?? false);
   const empty = visible.length === 0;
 
   useEffect(() => {
@@ -72,6 +103,7 @@ export function ChatPanel({
   const renamedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (useLocal) return;
     if (!threadId || renamedRef.current.has(threadId)) return;
     const thread = threads.find((t) => t.id === threadId);
     if (!thread) return;
@@ -90,12 +122,40 @@ export function ChatPanel({
       console.error("[ChatPanel] renameThread failed", err);
       renamedRef.current.delete(threadId);
     });
-  }, [threadId, threads, messages, renameThread]);
+  }, [useLocal, threadId, threads, messages, renameThread]);
 
   async function send(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || !agent) return;
+    if (!trimmed) return;
     setDraft("");
+
+    if (useLocal && transport) {
+      if (localRunning) return;
+      setLocalError(null);
+      const userMsg: ChatMessage = { id: uid(), role: "user", text: trimmed };
+      const next = [...localMessages, userMsg];
+      setLocalMessages(next);
+      setLocalRunning(true);
+      try {
+        const result = await transport.send({
+          messages: next.map((m) => ({ role: m.role, text: m.text })),
+          currentState: currentState ?? null,
+          locale,
+        });
+        onApplyState?.(result.state);
+        setLocalMessages((prev) => [
+          ...prev,
+          { id: uid(), role: "assistant", text: result.reply || "(sin respuesta)" },
+        ]);
+      } catch (err) {
+        setLocalError((err as Error).message);
+      } finally {
+        setLocalRunning(false);
+      }
+      return;
+    }
+
+    if (!agent) return;
     agent.addMessage({ id: uid(), role: "user", content: trimmed });
     try {
       const maybeRun = (agent as { runAgent?: (params?: unknown) => Promise<unknown> }).runAgent;
@@ -104,6 +164,15 @@ export function ChatPanel({
       }
     } catch (err) {
       console.error("[ChatPanel] runAgent failed", err);
+    }
+  }
+
+  function resetMessages() {
+    if (useLocal) {
+      setLocalMessages([]);
+      setLocalError(null);
+    } else {
+      agent?.setMessages([]);
     }
   }
 
@@ -129,7 +198,9 @@ export function ChatPanel({
               ‹
             </button>
           ) : null}
-          <span className="tracking-[0.24em] text-txt-low">// COPILOT</span>
+          <span className="tracking-[0.24em] text-txt-low">
+            // COPILOT{useLocal && transport ? ` · ${transport.name.toUpperCase()}` : ""}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {!empty ? (
@@ -149,7 +220,7 @@ export function ChatPanel({
               </button>
               <button
                 type="button"
-                onClick={() => agent?.setMessages([])}
+                onClick={resetMessages}
                 className="text-txt-low transition hover:text-txt-hi"
                 title="Reset conversation"
               >
@@ -201,6 +272,11 @@ export function ChatPanel({
           )
         )}
         {isRunning ? <StreamingDot /> : null}
+        {useLocal && localError ? (
+          <div className="rounded border border-red-500/40 bg-red-500/10 p-2 font-mono text-[11px] text-red-400">
+            {localError}
+          </div>
+        ) : null}
       </div>
 
       {/* Input */}
@@ -216,7 +292,8 @@ export function ChatPanel({
             onKeyDown={onKeyDown}
             rows={1}
             placeholder={empty ? "Describe the emergency…" : "Refine, escalate, or ask…"}
-            className="max-h-32 flex-1 resize-none bg-transparent text-base text-txt-hi placeholder:text-txt-low focus:outline-none md:text-sm"
+            disabled={isRunning}
+            className="max-h-32 flex-1 resize-none bg-transparent text-base text-txt-hi placeholder:text-txt-low focus:outline-none disabled:opacity-60 md:text-sm"
           />
           <button
             type="button"

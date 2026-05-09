@@ -18,6 +18,9 @@
 import { useEffect } from "react";
 import { CopilotKitProvider } from "@copilotkit/react-core/v2";
 import { installFetchLogger } from "@/lib/fetch-logger";
+import { installConsoleNoiseFilter } from "@/lib/console-filter";
+
+const GEMINI_DIRECT = process.env.NEXT_PUBLIC_DEMO_MODE === "gemini";
 
 export function CopilotKitProviderShell({
   children,
@@ -25,6 +28,10 @@ export function CopilotKitProviderShell({
   children: React.ReactNode;
 }) {
   useEffect(() => {
+    if (GEMINI_DIRECT) {
+      installConsoleNoiseFilter();
+      return;
+    }
     installFetchLogger();
   }, []);
 
