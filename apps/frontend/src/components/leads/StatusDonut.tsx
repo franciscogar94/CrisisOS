@@ -1,40 +1,49 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Lead } from "@/lib/leads/types";
-import { STATUSES } from "@/lib/leads/types";
+import type { ChecklistItem } from "@/lib/leads/types";
+import { CHECKLIST_PRIORITIES } from "@/lib/leads/types";
 
 export interface StatusDonutProps {
-  leads: Lead[];
+  checklist: ChecklistItem[];
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  "Not started": "#BEC2FF", // lilac
-  "In progress": "#85ECCE", // mint
-  Done: "#3D92E8", // blue
+const PRIORITY_COLOR: Record<string, string> = {
+  immediate: "#FF6B6B",
+  "short-term": "#FFAC4D",
+  "long-term": "#85ECCE",
 };
 
-const STATUS_TRACK = "#F0F0F4";
+const TRACK = "#F0F0F4";
 
-export function StatusDonut({ leads }: StatusDonutProps) {
+export function StatusDonut({ checklist }: StatusDonutProps) {
   const segments = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const s of STATUSES) counts.set(s, 0);
-    for (const l of leads) {
-      const s = l.status || "Not started";
-      counts.set(s, (counts.get(s) ?? 0) + 1);
+    const counts = new Map<string, { total: number; done: number }>();
+    for (const p of CHECKLIST_PRIORITIES) counts.set(p, { total: 0, done: 0 });
+    for (const i of checklist) {
+      const c = counts.get(i.priority);
+      if (!c) continue;
+      c.total += 1;
+      if (i.checked) c.done += 1;
     }
-    return STATUSES.map((s) => ({ status: s, count: counts.get(s) ?? 0 }));
-  }, [leads]);
+    return CHECKLIST_PRIORITIES.map((p) => ({
+      priority: p,
+      total: counts.get(p)?.total ?? 0,
+      done: counts.get(p)?.done ?? 0,
+    }));
+  }, [checklist]);
 
-  const total = leads.length;
+  const total = checklist.length;
+  const done = checklist.filter((i) => i.checked).length;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
   const radius = 56;
   const stroke = 14;
   const circumference = 2 * Math.PI * radius;
 
   let offset = 0;
   const arcs = segments.map((seg) => {
-    const fraction = total === 0 ? 0 : seg.count / total;
+    const fraction = total === 0 ? 0 : seg.total / total;
     const length = fraction * circumference;
     const dasharray = `${length} ${circumference - length}`;
     const dashoffset = -offset;
@@ -53,19 +62,14 @@ export function StatusDonut({ leads }: StatusDonutProps) {
           <g
             transform={`translate(${radius + stroke}, ${radius + stroke}) rotate(-90)`}
           >
-            <circle
-              r={radius}
-              fill="none"
-              stroke={STATUS_TRACK}
-              strokeWidth={stroke}
-            />
+            <circle r={radius} fill="none" stroke={TRACK} strokeWidth={stroke} />
             {total > 0
               ? arcs.map((arc) => (
                   <circle
-                    key={arc.status}
+                    key={arc.priority}
                     r={radius}
                     fill="none"
-                    stroke={STATUS_COLOR[arc.status] ?? "#BEC2FF"}
+                    stroke={PRIORITY_COLOR[arc.priority] ?? "#BEC2FF"}
                     strokeWidth={stroke}
                     strokeDasharray={arc.dasharray}
                     strokeDashoffset={arc.dashoffset}
@@ -82,7 +86,7 @@ export function StatusDonut({ leads }: StatusDonutProps) {
             className="fill-foreground"
             style={{ fontSize: 22, fontWeight: 600 }}
           >
-            {total}
+            {pct}%
           </text>
           <text
             x="50%"
@@ -90,38 +94,40 @@ export function StatusDonut({ leads }: StatusDonutProps) {
             dominantBaseline="middle"
             textAnchor="middle"
             className="fill-muted-foreground"
-            style={{ fontSize: 9, letterSpacing: 0.5, fontFamily: "var(--font-mono)", textTransform: "uppercase" }}
+            style={{
+              fontSize: 9,
+              letterSpacing: 0.5,
+              fontFamily: "var(--font-mono)",
+              textTransform: "uppercase",
+            }}
           >
-            leads
+            done
           </text>
         </svg>
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          status
+          checklist progress
         </div>
         <ul className="mt-2 grid gap-1.5">
           {segments.map((seg) => {
-            const pct = total === 0 ? 0 : Math.round((seg.count / total) * 100);
+            const segPct = seg.total === 0 ? 0 : Math.round((seg.done / seg.total) * 100);
             return (
-              <li
-                key={seg.status}
-                className="flex items-center gap-2 text-sm"
-              >
+              <li key={seg.priority} className="flex items-center gap-2 text-sm">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: STATUS_COLOR[seg.status] ?? "#BEC2FF" }}
+                  style={{ background: PRIORITY_COLOR[seg.priority] ?? "#BEC2FF" }}
                   aria-hidden
                 />
-                <span className="min-w-0 flex-1 truncate text-foreground">
-                  {seg.status}
+                <span className="min-w-0 flex-1 truncate text-foreground capitalize">
+                  {seg.priority.replace("-", " ")}
                 </span>
                 <span className="font-mono text-[12px] text-muted-foreground">
-                  {seg.count}
+                  {seg.done}/{seg.total}
                 </span>
                 <span className="w-9 text-right font-mono text-[10px] text-muted-foreground">
-                  {pct}%
+                  {segPct}%
                 </span>
               </li>
             );
