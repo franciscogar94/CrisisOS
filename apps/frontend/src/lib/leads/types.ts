@@ -183,9 +183,9 @@ export interface WeatherData {
 }
 
 export interface CrisisFilter {
-  resourceCategories: string[];
-  checklistPriorities: string[];
-  safeZoneTypes: string[];
+  resourceCategories: ResourceCategory[];
+  checklistPriorities: ChecklistPriority[];
+  safeZoneTypes: SafeZoneType[];
   search: string;
 }
 

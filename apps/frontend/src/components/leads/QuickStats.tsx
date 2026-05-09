@@ -1,77 +1,76 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Lead } from "@/lib/leads/types";
+import type { AgentState } from "@/lib/leads/types";
+import {
+  alertCount,
+  checklistProgress,
+  resourceDeficit,
+} from "@/lib/leads/derive";
 
 export interface QuickStatsProps {
-  leads: Lead[];
+  state: AgentState;
 }
 
 interface Tile {
   label: string;
   value: string;
   meta?: string;
-  accent?: "lilac" | "mint" | "blue" | "orange";
+  accent: "lilac" | "mint" | "blue" | "orange";
 }
 
-const ACCENT: Record<NonNullable<Tile["accent"]>, string> = {
+const ACCENT: Record<Tile["accent"], string> = {
   lilac: "#BEC2FF",
   mint: "#85ECCE",
   blue: "#3D92E8",
   orange: "#FFAC4D",
 };
 
-export function QuickStats({ leads }: QuickStatsProps) {
+export function QuickStats({ state }: QuickStatsProps) {
   const tiles = useMemo<Tile[]>(() => {
-    const total = leads.length;
+    const safeZones = state.safeZones.length;
+    const openZones = state.safeZones.filter((z) => z.status === "open").length;
 
-    const optIns = leads.filter((l) => l.opt_in).length;
-    const optInPct = total === 0 ? 0 : Math.round((optIns / total) * 100);
-
-    const workshopCounts = new Map<string, number>();
-    for (const l of leads) {
-      const w = l.workshop || "Not sure yet";
-      workshopCounts.set(w, (workshopCounts.get(w) ?? 0) + 1);
-    }
-    let topWorkshop: { name: string; count: number } | null = null;
-    for (const [name, count] of workshopCounts) {
-      if (!topWorkshop || count > topWorkshop.count) {
-        topWorkshop = { name, count };
-      }
-    }
-
-    const developers = leads.filter((l) => {
-      const t = l.technical_level;
-      return t === "Developer" || t === "Advanced / expert";
-    }).length;
+    const checklist = checklistProgress(state.checklist);
+    const resources = resourceDeficit(state.resources);
+    const alerts = alertCount(state.alerts);
 
     return [
       {
-        label: "total leads",
-        value: total.toString(),
-        meta: total === 1 ? "lead in canvas" : "leads in canvas",
+        label: "safe zones",
+        value: safeZones.toString(),
+        meta:
+          safeZones === 0
+            ? "none located"
+            : `${openZones} open / ${safeZones} total`,
         accent: "lilac",
       },
       {
-        label: "opt-in",
-        value: `${optInPct}%`,
-        meta: `${optIns} / ${total}`,
+        label: "checklist",
+        value: `${checklist.pct}%`,
+        meta: checklist.total === 0 ? "no items" : `${checklist.done} / ${checklist.total} done`,
         accent: "mint",
       },
       {
-        label: "top workshop",
-        value: topWorkshop?.name ?? "—",
-        meta: topWorkshop ? `${topWorkshop.count} interested` : "no leads yet",
+        label: "resources",
+        value: `${resources.pct}%`,
+        meta:
+          resources.criticalShort > 0
+            ? `${resources.criticalShort} critical short`
+            : "supplies covered",
         accent: "blue",
       },
       {
-        label: "developers",
-        value: developers.toString(),
-        meta: total === 0 ? "—" : `${Math.round((developers / total) * 100)}% of canvas`,
+        label: "service alerts",
+        value: (alerts.outage + alerts.degraded).toString(),
+        meta:
+          alerts.outage === 0 && alerts.degraded === 0
+            ? "all operational"
+            : `${alerts.outage} outage, ${alerts.degraded} degraded`,
         accent: "orange",
       },
     ];
-  }, [leads]);
+  }, [state]);
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -83,7 +82,7 @@ export function QuickStats({ leads }: QuickStatsProps) {
           <div className="flex items-center gap-2">
             <span
               className="size-2 rounded-full"
-              style={{ background: ACCENT[t.accent ?? "lilac"] }}
+              style={{ background: ACCENT[t.accent] }}
               aria-hidden
             />
             <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
