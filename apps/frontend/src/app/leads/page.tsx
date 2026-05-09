@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { z } from "zod";
 import { Toaster } from "sonner";
 import {
@@ -28,6 +36,7 @@ import type {
   WeatherData,
 } from "@/lib/leads/types";
 import { initialState } from "@/lib/leads/state";
+import { mockScenarios, type MockScenarioId } from "@/lib/leads/mock";
 import { Header } from "@/components/leads/Header";
 import { QuickStats } from "@/components/leads/QuickStats";
 import { StatusDonut } from "@/components/leads/StatusDonut";
@@ -35,7 +44,15 @@ import { WorkshopDemand } from "@/components/leads/WorkshopDemand";
 import { PipelineBoard } from "@/components/leads/PipelineBoard";
 import { LeadMiniCard } from "@/components/leads/inline/LeadMiniCard";
 import { EmailDraftCard } from "@/components/leads/inline/EmailDraftCard";
+import { MockControls } from "@/components/leads/MockControls";
 import { ToolFallbackCard } from "@/components/copilot/ToolFallbackCard";
+
+const MOCK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK === "1";
+
+const MockOverrideContext = createContext<{
+  mockOverride: AgentState | null;
+  setMockOverride: Dispatch<SetStateAction<AgentState | null>>;
+} | null>(null);
 
 function ClientOnly({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -197,15 +214,48 @@ function mergeAgentState(raw: unknown): AgentState {
 
 function useLiveAgentState() {
   const { agent } = useAgent();
-  const state = mergeAgentState(agent?.state);
+  const ctx = useContext(MockOverrideContext);
+  const mockOverride = ctx?.mockOverride ?? null;
+  const setMockOverride = ctx?.setMockOverride;
+  const baseState = mergeAgentState(agent?.state);
+  const state = mockOverride ?? baseState;
   const setState = (updater: (prev: AgentState) => AgentState) => {
+    if (mockOverride !== null && setMockOverride) {
+      setMockOverride((prev) => updater(prev ?? mockOverride));
+      return;
+    }
     agent?.setState(updater(mergeAgentState(agent?.state)));
   };
   return { agent, state, setState };
 }
 
 function CanvasInner() {
-  const { state, setState } = useLiveAgentState();
+  const [mockOverride, setMockOverride] = useState<AgentState | null>(null);
+  const mockCtx = useMemo(
+    () => ({ mockOverride, setMockOverride }),
+    [mockOverride],
+  );
+  return (
+    <MockOverrideContext.Provider value={mockCtx}>
+      <CanvasBody />
+    </MockOverrideContext.Provider>
+  );
+}
+
+function CanvasBody() {
+  const { agent, state, setState } = useLiveAgentState();
+  const mockCtx = useContext(MockOverrideContext);
+  const mockOverride = mockCtx?.mockOverride ?? null;
+  const setMockOverride = mockCtx?.setMockOverride;
+
+  // Auto-clear mock when the agent emits a real (non-mock) crisis.
+  useEffect(() => {
+    if (!mockOverride || !setMockOverride) return;
+    const real = mergeAgentState(agent?.state);
+    if (real.crisis && !real.crisis.id.startsWith("mock:")) {
+      setMockOverride(null);
+    }
+  }, [agent?.state, mockOverride, setMockOverride]);
 
   useConfigureSuggestions({
     suggestions: [
@@ -518,14 +568,27 @@ function CanvasInner() {
     });
   }
 
+  const mockActive = mockOverride !== null;
+  const loadMock = (id: MockScenarioId) => {
+    setMockOverride?.(mockScenarios[id]);
+  };
+  const clearMock = () => {
+    setMockOverride?.(null);
+  };
+
   return (
     <>
       <main className="flex h-screen flex-col gap-5 overflow-hidden bg-background px-6 py-6">
-        <Header
-          title={state.header.title}
-          subtitle={state.header.subtitle}
-          crisis={state.crisis}
-        />
+        <div className="flex items-start justify-between gap-3">
+          <Header
+            title={state.header.title}
+            subtitle={state.header.subtitle}
+            crisis={state.crisis}
+          />
+          {MOCK_ENABLED && mockActive ? (
+            <MockControls active onClear={clearMock} />
+          ) : null}
+        </div>
 
         {state.crisis === null ? (
           <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -537,6 +600,9 @@ function CanvasInner() {
                 Describe an emergency in the chat to generate your operations
                 center — situation, map, evacuation checklist, resources, alerts.
               </p>
+              {MOCK_ENABLED ? (
+                <MockControls active={false} onLoad={loadMock} />
+              ) : null}
             </div>
           </div>
         ) : (
