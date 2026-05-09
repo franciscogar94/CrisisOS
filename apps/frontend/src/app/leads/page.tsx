@@ -36,7 +36,8 @@ import type {
   WeatherData,
 } from "@/lib/leads/types";
 import { initialState } from "@/lib/leads/state";
-import { mockScenarios, type MockScenarioId } from "@/lib/leads/mock";
+import { mockScenariosByLocale, type MockScenarioId } from "@/lib/leads/mock";
+import { useLocale } from "@/lib/i18n/context";
 import { Header } from "@/components/leads/Header";
 import { QuickStats } from "@/components/leads/QuickStats";
 import { StatusDonut } from "@/components/leads/StatusDonut";
@@ -249,6 +250,7 @@ function CanvasBody() {
   const mockCtx = useContext(MockOverrideContext);
   const mockOverride = mockCtx?.mockOverride ?? null;
   const setMockOverride = mockCtx?.setMockOverride;
+  const { t, locale } = useLocale();
 
   // Auto-clear mock when the agent emits a real (non-mock) crisis.
   useEffect(() => {
@@ -259,26 +261,31 @@ function CanvasBody() {
     }
   }, [agent?.state, mockOverride, setMockOverride]);
 
+  // When the locale toggles while mock is active, swap to the matching
+  // language fixture so demo content follows the UI chrome.
+  useEffect(() => {
+    if (!mockOverride || !setMockOverride) return;
+    const id = mockOverride.crisis?.id;
+    if (!id) return;
+    const scenarioId: MockScenarioId | null = id.includes("eq")
+      ? "earthquake"
+      : id.includes("fl")
+        ? "flood"
+        : id.includes("wf")
+          ? "wildfire"
+          : null;
+    if (!scenarioId) return;
+    const next = mockScenariosByLocale[locale][scenarioId];
+    if (next !== mockOverride) setMockOverride(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
+
   useConfigureSuggestions({
     suggestions: [
-      {
-        title: "Earthquake in Santiago",
-        message:
-          "There's a magnitude 7.2 earthquake in Santiago, Chile. Generate the operations center.",
-      },
-      {
-        title: "Coastal flood",
-        message:
-          "Severe coastal flooding in Valparaíso, Chile. Generate evacuation plan.",
-      },
-      {
-        title: "Wildfire emergency",
-        message: "Wildfire approaching residential area near Viña del Mar. Help me.",
-      },
-      {
-        title: "Mark all immediate items done",
-        message: "Mark every immediate-priority checklist item as done.",
-      },
+      { title: t("suggestion.eq.title"), message: t("suggestion.eq.message") },
+      { title: t("suggestion.flood.title"), message: t("suggestion.flood.message") },
+      { title: t("suggestion.wildfire.title"), message: t("suggestion.wildfire.message") },
+      { title: t("suggestion.checklist.title"), message: t("suggestion.checklist.message") },
     ],
   });
 
@@ -572,7 +579,7 @@ function CanvasBody() {
 
   const mockActive = mockOverride !== null;
   const loadMock = (id: MockScenarioId) => {
-    setMockOverride?.(mockScenarios[id]);
+    setMockOverride?.(mockScenariosByLocale[locale][id]);
   };
   const clearMock = () => {
     setMockOverride?.(null);
@@ -584,7 +591,11 @@ function CanvasBody() {
         <div className="flex items-start justify-between gap-3">
           <Header
             title={state.header.title}
-            subtitle={state.header.subtitle}
+            subtitle={
+              state.crisis === null && state.header.subtitle === initialState.header.subtitle
+                ? t("header.subtitle")
+                : state.header.subtitle
+            }
             crisis={state.crisis}
           />
           {MOCK_ENABLED && mockActive ? (
@@ -596,11 +607,10 @@ function CanvasBody() {
           <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
             <div className="max-w-md">
               <p className="text-base font-medium text-foreground">
-                No active crisis.
+                {t("empty.title")}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Describe an emergency in the chat to generate your operations
-                center — situation, map, evacuation checklist, resources, alerts.
+                {t("empty.body")}
               </p>
               {MOCK_ENABLED ? (
                 <MockControls active={false} onLoad={loadMock} />

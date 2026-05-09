@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Plus_Jakarta_Sans, Spline_Sans_Mono } from "next/font/google";
 import { CopilotKitProviderShell } from "@/components/copilot/CopilotKitProviderShell";
+import { LocaleProvider } from "@/lib/i18n/context";
 import "./globals.css";
 // v2 owns its own stylesheet. Do NOT import @copilotkit/react-ui/styles.css —
 // v1's .copilotKitButton / .copilotKitSidebar / .copilotKitWindow rules
@@ -35,7 +36,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${jakarta.variable} ${splineMono.variable}`}>
       <body className={`${jakarta.variable} ${splineMono.variable} subpixel-antialiased`}>
-        <CopilotKitProviderShell>{children}</CopilotKitProviderShell>
+        <LocaleProvider>
+          <CopilotKitProviderShell>{children}</CopilotKitProviderShell>
+        </LocaleProvider>
       </body>
     </html>
   );
