@@ -1,17 +1,15 @@
 import { serve } from "@hono/node-server";
+import { Hono } from "hono";
 import {
   CopilotRuntime,
-  CopilotKitIntelligence,
   createCopilotEndpoint,
 } from "@copilotkit/runtime/v2";
 import { LangGraphAgent } from "@copilotkit/runtime/langgraph";
 
-const intelligence = new CopilotKitIntelligence({
-  apiKey:
-    process.env.INTELLIGENCE_API_KEY ?? "cpk_sPRVSEED_seed0privat0longtoken00",
-  apiUrl: process.env.INTELLIGENCE_API_URL ?? "http://localhost:4203",
-  wsUrl: process.env.INTELLIGENCE_GATEWAY_WS_URL ?? "ws://localhost:4403",
-});
+// Intelligence intentionally not wired: forces hand-off to ws://localhost:4403,
+// which remote clients (e.g. frontend partner via ngrok) cannot resolve.
+// Without it the runtime streams SSE through the same HTTP tunnel that already
+// works. Trade-off: no thread persistence (refresh = new conversation).
 
 const agent = new LangGraphAgent({
   deploymentUrl:
@@ -25,10 +23,10 @@ const agent = new LangGraphAgent({
   },
 });
 
-const app = createCopilotEndpoint({
+const copilotApp = createCopilotEndpoint({
   basePath: "/api/copilotkit",
   runtime: new CopilotRuntime({
-    intelligence,
+    // intelligence,  // Headless demo — Cloud Run image legacy-services bug. Re-enable when fixed.
     identifyUser: () => ({ id: "default", name: "Hackathon User" }),
     licenseToken: process.env.COPILOTKIT_LICENSE_TOKEN,
     agents: { default: agent },
@@ -45,6 +43,19 @@ const app = createCopilotEndpoint({
     },
   }),
 });
+
+// Parent Hono app — registers our handlers BEFORE delegating to the
+// CopilotKit runtime, so we can short-circuit problematic paths.
+const app = new Hono();
+
+// Some CopilotKit clients probe the runtime base path before hitting
+// /agent/:id/run. The v2 runtime registers .all("*") for /api/copilotkit
+// and returns 404 internally for the bare path. Intercept here and
+// return an empty 200 so the client probe doesn't 404.
+app.all("/api/copilotkit", (c) => c.json({}, 200));
+
+// Mount the CopilotKit runtime — receives any path that didn't match above.
+app.route("/", copilotApp);
 
 // Rewrite known 5xx error bodies into structured `{ error, hint, command }`
 // payloads the UI can render as actionable toasts. Conservative matching —
