@@ -1,11 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Map as MapIcon, ListChecks, Package, Clock, AlertOctagon, LayoutDashboard } from "lucide-react";
-import type { ActiveModule, AgentState } from "@/lib/leads/types";
-import { LeadCard } from "@/components/leads/LeadCard";
+import type {
+  ActiveModule,
+  AgentState,
+  CrisisSeverity,
+  ServiceStatus,
+} from "@/lib/leads/types";
 import { EvacuationChecklist } from "@/components/leads/EvacuationChecklist";
 import { ResourceTable } from "@/components/leads/ResourceTable";
+import { Timeline } from "@/components/leads/Timeline";
+import { AlertBanner } from "@/components/ui/alert-banner";
+import { SeverityChip } from "@/components/ui/severity-chip";
+import type { Severity } from "@/components/ui/severity-chip";
 import { useLocale } from "@/lib/i18n/context";
 
 const CrisisMap = dynamic(
@@ -22,17 +29,13 @@ export interface ModuleTabsProps {
   onToggleTimelineEntry: (entryId: string) => void;
 }
 
-const TABS: ReadonlyArray<{
-  id: ActiveModule;
-  labelKey: string;
-  icon: typeof MapIcon;
-}> = [
-  { id: "overview", labelKey: "tabs.overview", icon: LayoutDashboard },
-  { id: "map", labelKey: "tabs.map", icon: MapIcon },
-  { id: "checklist", labelKey: "tabs.checklist", icon: ListChecks },
-  { id: "resources", labelKey: "tabs.resources", icon: Package },
-  { id: "timeline", labelKey: "tabs.timeline", icon: Clock },
-  { id: "alerts", labelKey: "tabs.alerts", icon: AlertOctagon },
+const TABS: ReadonlyArray<{ id: ActiveModule; labelKey: string }> = [
+  { id: "overview", labelKey: "tabs.overview" },
+  { id: "map", labelKey: "tabs.map" },
+  { id: "checklist", labelKey: "tabs.checklist" },
+  { id: "resources", labelKey: "tabs.resources" },
+  { id: "timeline", labelKey: "tabs.timeline" },
+  { id: "alerts", labelKey: "tabs.alerts" },
 ];
 
 export function PipelineBoard({
@@ -45,34 +48,35 @@ export function PipelineBoard({
 }: ModuleTabsProps) {
   const active = state.activeModule;
   const { t } = useLocale();
+  const counts = tabCounts(state);
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col border border-line bg-bg-2">
       <nav
         role="tablist"
-        className="flex flex-wrap items-center gap-1 border-b border-border px-2 py-2"
+        className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-bg-2/80 px-5"
       >
         {TABS.map((tab) => {
           const isActive = active === tab.id;
-          const Icon = tab.icon;
+          const count = counts[tab.id];
           return (
             <button
               key={tab.id}
               role="tab"
               aria-selected={isActive}
               onClick={() => onModuleChange(tab.id)}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+              className={`px-3 py-1.5 font-mono text-xs uppercase tracking-[0.12em] transition border-b-2 ${
                 isActive
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "border-brand text-txt-hi"
+                  : "border-transparent text-txt-low hover:text-txt-mid"
               }`}
             >
-              <Icon className="size-3.5" />
               {t(tab.labelKey)}
+              {count ? <span className={`ml-1.5 ${count.tone}`}>{count.label}</span> : null}
             </button>
           );
         })}
       </nav>
-      <div className="flex min-h-0 flex-1 overflow-auto p-4">
+      <div className={`flex min-h-0 flex-1 ${active === "map" ? "" : "overflow-auto p-5"}`}>
         {active === "overview" ? (
           <OverviewModule state={state} />
         ) : active === "map" ? (
@@ -82,6 +86,10 @@ export function PipelineBoard({
             highlightedZoneIds={state.highlightedZoneIds}
             selectedZoneId={state.selectedZoneId}
             onSelectZone={onSelectZone}
+            affectedCount={null}
+            evacuatedCount={null}
+            shelteredCount={state.safeZones.filter((z) => z.status === "open").length}
+            etaStable={null}
           />
         ) : active === "checklist" ? (
           <EvacuationChecklist
@@ -94,10 +102,7 @@ export function PipelineBoard({
             onUpdateHave={onUpdateResource}
           />
         ) : active === "timeline" ? (
-          <TimelineModule
-            entries={state.timeline}
-            onToggle={onToggleTimelineEntry}
-          />
+          <Timeline entries={state.timeline} onToggle={onToggleTimelineEntry} />
         ) : active === "alerts" ? (
           <AlertsModule state={state} />
         ) : null}
@@ -108,10 +113,30 @@ export function PipelineBoard({
 
 function MapPlaceholder() {
   return (
-    <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+    <div className="flex h-full w-full items-center justify-center text-sm text-txt-low">
       …
     </div>
   );
+}
+
+function tabCounts(state: AgentState): Record<ActiveModule, { label: string; tone: string } | null> {
+  const checklistDone = state.checklist.filter((i) => i.checked).length;
+  const checklistTotal = state.checklist.length;
+  const resourceTotal = state.resources.length;
+  const alertCritical = state.alerts.filter((a) => a.status === "outage").length;
+  const alertTotal = state.alerts.length;
+  return {
+    overview: null,
+    map: null,
+    checklist: checklistTotal
+      ? { label: `${checklistDone}/${checklistTotal}`, tone: "text-emerald-400" }
+      : null,
+    resources: resourceTotal ? { label: String(resourceTotal), tone: "text-txt-low" } : null,
+    timeline: null,
+    alerts: alertTotal
+      ? { label: String(alertTotal), tone: alertCritical ? "text-red-400" : "text-txt-low" }
+      : null,
+  };
 }
 
 function OverviewModule({ state }: { state: AgentState }) {
@@ -120,143 +145,104 @@ function OverviewModule({ state }: { state: AgentState }) {
     return (
       <div className="flex w-full items-center justify-center py-16 text-center">
         <div>
-          <p className="text-base font-medium text-foreground">{t("empty.title")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t("empty.body")}</p>
+          <p className="text-base font-medium text-txt-hi">{t("empty.title")}</p>
+          <p className="mt-1 text-sm text-txt-mid">{t("empty.body")}</p>
         </div>
       </div>
     );
   }
-  const { crisis, safeZones, alerts } = state;
+  const { crisis, safeZones, alerts, checklist, resources } = state;
   const openZones = safeZones.filter((z) => z.status === "open");
   const outageAlerts = alerts.filter((a) => a.status === "outage");
+  const checklistDone = checklist.filter((i) => i.checked).length;
+  const criticalRes = resources.filter((r) => r.critical && r.have < r.need).length;
   return (
-    <div className="grid w-full gap-4 lg:grid-cols-2">
-      <div className="rounded-xl border border-border bg-background p-4">
-        <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          {t("overview.situation")}
+    <div className="grid w-full auto-rows-min gap-4 lg:grid-cols-3">
+      <div className="border border-line bg-bg p-4 lg:col-span-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-txt-low">
+            // SITUATION
+          </div>
+          <SeverityChip severity={mapSeverity(crisis.severity)} />
         </div>
-        <h3 className="mt-2 text-lg font-semibold text-foreground">
-          {crisis.title}
-        </h3>
-        <p className="mt-2 text-sm text-muted-foreground">{crisis.description}</p>
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          <dt className="text-muted-foreground">{t("overview.field.type")}</dt>
-          <dd className="text-foreground">{t(`type.${crisis.type}`)}</dd>
-          <dt className="text-muted-foreground">{t("overview.field.severity")}</dt>
-          <dd className="text-foreground">{t(`severity.${crisis.severity}`)}</dd>
-          <dt className="text-muted-foreground">{t("overview.field.radius")}</dt>
-          <dd className="text-foreground">
-            {t("common.km", { n: crisis.affectedRadius })}
-          </dd>
-          <dt className="text-muted-foreground">{t("overview.field.reported")}</dt>
-          <dd className="text-foreground">
-            {new Date(crisis.timestamp).toLocaleString()}
-          </dd>
+        <h3 className="mt-2 text-lg font-semibold text-txt-hi">{crisis.title}</h3>
+        <p className="mt-2 text-sm text-txt-mid">{crisis.description}</p>
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs">
+          <dt className="text-txt-low">{t("overview.field.type")}</dt>
+          <dd className="text-txt-hi">{t(`type.${crisis.type}`)}</dd>
+          <dt className="text-txt-low">{t("overview.field.severity")}</dt>
+          <dd className="text-txt-hi">{t(`severity.${crisis.severity}`)}</dd>
+          <dt className="text-txt-low">{t("overview.field.radius")}</dt>
+          <dd className="text-txt-hi">{t("common.km", { n: crisis.affectedRadius })}</dd>
+          <dt className="text-txt-low">{t("overview.field.reported")}</dt>
+          <dd className="text-txt-hi">{new Date(crisis.timestamp).toLocaleString()}</dd>
         </dl>
       </div>
-      <div className="grid gap-3">
-        <div className="rounded-xl border border-border bg-background p-4">
-          <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            {t("overview.zones")}
-          </div>
-          {openZones.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">{t("common.no_data")}</p>
-          ) : (
-            <ul className="mt-2 grid gap-2">
-              {openZones.slice(0, 4).map((z) => (
-                <li key={z.id}>
-                  <LeadCard zone={z} compact />
-                </li>
-              ))}
-            </ul>
-          )}
+      <div className="grid grid-cols-2 gap-2 self-start">
+        <KPI label="ZONES OPEN" value={String(openZones.length)} tone="text-emerald-400" />
+        <KPI
+          label="CHECKLIST"
+          value={`${checklistDone}/${checklist.length}`}
+          tone="text-brand"
+        />
+        <KPI label="OUTAGES" value={String(outageAlerts.length)} tone="text-red-400" />
+        <KPI label="CRITICAL RES" value={String(criticalRes)} tone="text-amber-400" />
+      </div>
+
+      <div className="border border-line bg-bg p-4 lg:col-span-2">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-txt-low">
+          // ACTIVE ALERTS
         </div>
-        <div className="rounded-xl border border-border bg-background p-4">
-          <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            {t("overview.outages")}
-          </div>
-          {outageAlerts.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">{t("common.no_data")}</p>
-          ) : (
-            <ul className="mt-2 grid gap-1.5 text-sm">
-              {outageAlerts.map((a) => (
-                <li key={a.id} className="flex items-start gap-2">
-                  <span className="mt-1 size-2 shrink-0 rounded-full bg-rose-500" />
-                  <span className="text-foreground">{t(`service.${a.service}`)}:</span>
-                  <span className="text-muted-foreground">{a.message}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+        {alerts.length === 0 ? (
+          <p className="mt-2 text-sm text-txt-low">{t("common.no_data")}</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {alerts.slice(0, 4).map((a) => (
+              <AlertBanner
+                key={a.id}
+                severity={alertSeverity(a.status)}
+                title={t(`service.${a.service}`)}
+                body={a.message}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="border border-line bg-bg p-4">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-txt-low">
+          // SAFE ZONES
         </div>
+        {openZones.length === 0 ? (
+          <p className="mt-2 text-sm text-txt-low">{t("common.no_data")}</p>
+        ) : (
+          <ul className="mt-2 grid gap-1">
+            {openZones.slice(0, 6).map((z) => (
+              <li
+                key={z.id}
+                className="flex items-center justify-between border-b border-line py-1.5 text-xs last:border-0"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-txt-hi">{z.name}</span>
+                </span>
+                {z.distance != null ? (
+                  <span className="font-mono text-txt-low">{z.distance.toFixed(1)}km</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
 }
 
-function TimelineModule({
-  entries,
-  onToggle,
-}: {
-  entries: AgentState["timeline"];
-  onToggle: (id: string) => void;
-}) {
-  const { t } = useLocale();
-  if (entries.length === 0) {
-    return (
-      <div className="flex w-full items-center justify-center text-sm text-muted-foreground">
-        —
-      </div>
-    );
-  }
-  const phases: Array<{ id: AgentState["timeline"][number]["phase"]; labelKey: string }> = [
-    { id: "first_5_min", labelKey: "phase.first_5_min" },
-    { id: "first_hour", labelKey: "phase.first_hour" },
-    { id: "first_day", labelKey: "phase.first_day" },
-    { id: "first_week", labelKey: "phase.first_week" },
-  ];
+function KPI({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {phases.map((p) => {
-        const phaseEntries = entries.filter((e) => e.phase === p.id);
-        return (
-          <div
-            key={p.id}
-            className="rounded-xl border border-border bg-background p-3"
-          >
-            <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-              {t(p.labelKey)}
-            </div>
-            <ul className="mt-2 grid gap-1.5">
-              {phaseEntries.length === 0 ? (
-                <li className="text-xs text-muted-foreground">—</li>
-              ) : (
-                phaseEntries
-                  .sort((a, b) => a.order - b.order)
-                  .map((e) => (
-                    <li key={e.id} className="flex items-start gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={e.completed}
-                        onChange={() => onToggle(e.id)}
-                        className="mt-0.5"
-                      />
-                      <span
-                        className={
-                          e.completed
-                            ? "text-muted-foreground line-through"
-                            : "text-foreground"
-                        }
-                      >
-                        {e.action}
-                      </span>
-                    </li>
-                  ))
-              )}
-            </ul>
-          </div>
-        );
-      })}
+    <div className="border border-line bg-bg p-3 font-mono">
+      <div className="text-[10px] tracking-[0.2em] text-txt-low">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${tone}`}>{value}</div>
     </div>
   );
 }
@@ -265,42 +251,34 @@ function AlertsModule({ state }: { state: AgentState }) {
   const { t } = useLocale();
   if (state.alerts.length === 0) {
     return (
-      <div className="flex w-full items-center justify-center text-sm text-muted-foreground">
-        —
-      </div>
+      <div className="flex w-full items-center justify-center text-sm text-txt-low">—</div>
     );
   }
   return (
-    <ul className="grid w-full gap-2">
+    <ul className="grid w-full auto-rows-min gap-2">
       {state.alerts.map((a) => (
-        <li
+        <AlertBanner
           key={a.id}
-          className="flex items-start gap-3 rounded-xl border border-border bg-background p-3"
-        >
-          <span
-            className={`mt-1 size-2 shrink-0 rounded-full ${
-              a.status === "outage"
-                ? "bg-rose-500"
-                : a.status === "degraded"
-                  ? "bg-amber-500"
-                  : a.status === "operational"
-                    ? "bg-emerald-500"
-                    : "bg-slate-400"
-            }`}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {t(`service.${a.service}`)}
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                {t(`service_status.${a.status}`)}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{a.message}</p>
-          </div>
-        </li>
+          severity={alertSeverity(a.status)}
+          label={t(`service_status.${a.status}`).toUpperCase()}
+          title={t(`service.${a.service}`)}
+          body={a.message}
+        />
       ))}
     </ul>
   );
+}
+
+function alertSeverity(status: ServiceStatus): Severity {
+  if (status === "outage") return "critical";
+  if (status === "degraded") return "high";
+  if (status === "operational") return "safe";
+  return "info";
+}
+
+function mapSeverity(s: CrisisSeverity): Severity {
+  if (s === "critical") return "critical";
+  if (s === "high") return "high";
+  if (s === "moderate") return "info";
+  return "safe";
 }

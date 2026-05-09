@@ -37,3 +37,7 @@ PLAN.md
 
 # Claude Code project context (local only, not for public repo)
 CLAUDE.md
+
+# Local design handoff (HTML mockup + tokens). Used to brief other Claude Code
+# sessions on the frontend redesign. Per-checkout, never committed.
+apps/frontend/design/

@@ -13,15 +13,11 @@ import { z } from "zod";
 import { Toaster } from "sonner";
 import {
   CopilotChatConfigurationProvider,
-  CopilotSidebar,
   useAgent,
   useConfigureSuggestions,
   useDefaultRenderTool,
   useFrontendTool,
 } from "@copilotkit/react-core/v2";
-import { ThreadsDrawer } from "@/components/threads-drawer";
-import drawerStyles from "@/components/threads-drawer/threads-drawer.module.css";
-
 import type {
   ActiveModule,
   AgentState,
@@ -39,8 +35,7 @@ import { initialState } from "@/lib/leads/state";
 import { mockScenariosByLocale, type MockScenarioId } from "@/lib/leads/mock";
 import { useLocale } from "@/lib/i18n/context";
 import { Header } from "@/components/leads/Header";
-import { QuickStats } from "@/components/leads/QuickStats";
-import { StatusDonut } from "@/components/leads/StatusDonut";
+import { ChatPanel } from "@/components/leads/ChatPanel";
 import { WorkshopDemand } from "@/components/leads/WorkshopDemand";
 import { PipelineBoard } from "@/components/leads/PipelineBoard";
 import { LeadMiniCard } from "@/components/leads/inline/LeadMiniCard";
@@ -587,44 +582,31 @@ function CanvasBody() {
 
   return (
     <>
-      <main className="flex h-screen flex-col gap-5 overflow-y-auto bg-background px-6 py-6">
-        <div className="flex items-start justify-between gap-3">
-          <Header
-            title={state.header.title}
-            subtitle={
-              state.crisis === null && state.header.subtitle === initialState.header.subtitle
-                ? t("header.subtitle")
-                : state.header.subtitle
-            }
-            crisis={state.crisis}
-          />
-          {MOCK_ENABLED && mockActive ? (
-            <MockControls active onClear={clearMock} />
-          ) : null}
-        </div>
+      <main className="flex h-screen flex-col bg-bg">
+        <Header
+          title={state.header.title}
+          subtitle={
+            state.crisis === null && state.header.subtitle === initialState.header.subtitle
+              ? t("header.subtitle")
+              : state.header.subtitle
+          }
+          crisis={state.crisis}
+          weatherTemp={state.weather?.temperature ?? null}
+          weatherDesc={state.weather?.description ?? null}
+        />
 
-        {state.crisis === null ? (
-          <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
-            <div className="max-w-md">
-              <p className="text-base font-medium text-foreground">
-                {t("empty.title")}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {t("empty.body")}
-              </p>
-              {MOCK_ENABLED ? (
-                <MockControls active={false} onLoad={loadMock} />
-              ) : null}
-            </div>
+        {MOCK_ENABLED && mockActive ? (
+          <div className="flex justify-end border-b border-line bg-bg-2 px-5 py-1.5">
+            <MockControls active onClear={clearMock} />
           </div>
-        ) : (
-          <>
-            <QuickStats state={state} />
-            <div className="grid gap-3 md:grid-cols-2">
-              <StatusDonut checklist={state.checklist} />
-              <WorkshopDemand resources={state.resources} compact />
-            </div>
-            <div className="flex min-h-[480px] flex-1 flex-col">
+        ) : null}
+
+        <div className="flex min-h-0 flex-1">
+          <ChatPanel />
+          <section className="flex min-h-0 flex-1 flex-col">
+            {state.crisis === null ? (
+              <EmptyCanvas onLoadMock={MOCK_ENABLED ? loadMock : undefined} />
+            ) : (
               <PipelineBoard
                 state={state}
                 onModuleChange={setActiveModule}
@@ -633,26 +615,65 @@ function CanvasBody() {
                 onUpdateResource={updateResourceLocal}
                 onToggleTimelineEntry={toggleTimelineEntry}
               />
-            </div>
-          </>
-        )}
+            )}
+          </section>
+        </div>
       </main>
-
-      <CopilotSidebar
-        defaultOpen
-        width={420}
-        input={{ disclaimer: () => null, className: "pb-6" }}
-      />
 
       <Toaster
         position="bottom-right"
         toastOptions={{
           classNames: {
-            error: "!bg-rose-50 !text-rose-900 !border !border-rose-200",
+            error: "!bg-red-950 !text-red-200 !border !border-red-500/40",
           },
         }}
       />
     </>
+  );
+}
+
+function EmptyCanvas({ onLoadMock }: { onLoadMock?: (id: MockScenarioId) => void }) {
+  const { t } = useLocale();
+  return (
+    <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-bg">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{
+          backgroundImage:
+            "linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
+      <div className="relative max-w-md text-center">
+        <div className="mx-auto mb-6 flex size-16 rotate-45 items-center justify-center border-2 border-line-strong">
+          <div className="size-6 bg-line-strong" />
+        </div>
+        <div className="font-mono text-[11px] tracking-[0.3em] text-txt-low">
+          // AWAITING INPUT
+        </div>
+        <h2 className="mt-2 mb-3 text-2xl font-bold text-txt-hi">{t("empty.title")}</h2>
+        <p className="text-sm leading-relaxed text-txt-mid">{t("empty.body")}</p>
+        <div className="mt-6 inline-flex items-center gap-2 font-mono text-[11px] text-txt-low">
+          <Kbd>⌘</Kbd>
+          <Kbd>K</Kbd>
+          <span>focus chat</span>
+        </div>
+        {onLoadMock ? (
+          <div className="mt-8">
+            <MockControls active={false} onLoad={onLoadMock} />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-sm border border-line border-b-2 px-1.5 py-0.5 text-txt-mid">
+      {children}
+    </span>
   );
 }
 
@@ -666,20 +687,11 @@ function LiveResourceBars() {
 }
 
 function HomePage() {
-  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const [threadId] = useState<string | undefined>(undefined);
   return (
-    <div className={drawerStyles.layout}>
-      <ThreadsDrawer
-        agentId="default"
-        threadId={threadId}
-        onThreadChange={setThreadId}
-      />
-      <div className={drawerStyles.mainPanel}>
-        <CopilotChatConfigurationProvider agentId="default" threadId={threadId}>
-          <CanvasInner />
-        </CopilotChatConfigurationProvider>
-      </div>
-    </div>
+    <CopilotChatConfigurationProvider agentId="default" threadId={threadId}>
+      <CanvasInner />
+    </CopilotChatConfigurationProvider>
   );
 }
 

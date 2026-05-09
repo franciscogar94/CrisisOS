@@ -1,20 +1,31 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Minus, Plus } from "lucide-react";
-import type { Resource } from "@/lib/leads/types";
-import { resourceCategoryClass, resourceDeficit } from "@/lib/leads/derive";
+import type { Resource, ResourceCategory } from "@/lib/leads/types";
+import { resourceDeficit } from "@/lib/leads/derive";
+import { useLocale } from "@/lib/i18n/context";
+import { StatusChip } from "@/components/ui/status-chip";
 
 export interface ResourceTableProps {
   resources: Resource[];
   onUpdateHave: (resourceId: string, have: number) => void;
 }
 
-export function ResourceTable({ resources, onUpdateHave }: ResourceTableProps) {
-  const summary = useMemo(() => resourceDeficit(resources), [resources]);
+type CategoryFilter = ResourceCategory | "all";
 
-  const sorted = useMemo(() => {
-    const copy = resources.slice();
+export function ResourceTable({ resources, onUpdateHave }: ResourceTableProps) {
+  const { t } = useLocale();
+  const [filter, setFilter] = useState<CategoryFilter>("all");
+
+  const summary = useMemo(() => resourceDeficit(resources), [resources]);
+  const categories = useMemo(() => {
+    const set = new Set<ResourceCategory>();
+    for (const r of resources) set.add(r.category);
+    return Array.from(set);
+  }, [resources]);
+
+  const filtered = useMemo(() => {
+    const copy = filter === "all" ? resources.slice() : resources.filter((r) => r.category === filter);
     copy.sort((a, b) => {
       if (a.critical !== b.critical) return a.critical ? -1 : 1;
       const aPct = a.need === 0 ? 100 : (a.have / a.need) * 100;
@@ -22,66 +33,117 @@ export function ResourceTable({ resources, onUpdateHave }: ResourceTableProps) {
       return aPct - bPct;
     });
     return copy;
-  }, [resources]);
+  }, [resources, filter]);
 
   if (resources.length === 0) {
     return (
-      <div className="flex w-full items-center justify-center text-sm text-muted-foreground">
-        No resources tracked.
-      </div>
+      <div className="flex w-full items-center justify-center text-sm text-txt-low">—</div>
     );
   }
 
+  const criticalShort = summary.criticalShort;
+  const fullyStocked = resources.filter((r) => r.have >= r.need).length;
+  const partial = resources.length - fullyStocked - criticalShort;
+
   return (
-    <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-background p-4">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            coverage
-          </div>
-          <div className="text-2xl font-semibold text-foreground">
-            {summary.pct}%
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {summary.totalHave}/{summary.totalNeed} units
-            </span>
-          </div>
-        </div>
-        {summary.criticalShort > 0 ? (
-          <div className="flex items-center gap-2 rounded-md bg-rose-500/10 px-3 py-1.5 text-sm text-rose-700 dark:text-rose-300">
-            <AlertTriangle className="size-4" />
-            {summary.criticalShort} critical resource
-            {summary.criticalShort === 1 ? "" : "s"} short
-          </div>
-        ) : null}
+    <div className="flex w-full flex-col">
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-bg-2/50 px-5 py-3 font-mono text-xs">
+        <span className="tracking-[0.2em] text-txt-low">FILTER</span>
+        <FilterChip
+          active={filter === "all"}
+          onClick={() => setFilter("all")}
+          label={`ALL · ${resources.length}`}
+          activeTone="brand"
+        />
+        {categories.map((c) => (
+          <FilterChip
+            key={c}
+            active={filter === c}
+            onClick={() => setFilter(c)}
+            label={`${c.toUpperCase()} · ${resources.filter((r) => r.category === c).length}`}
+          />
+        ))}
+        <span className="ml-auto text-txt-low">
+          {t("resources.coverage") || "COVERAGE"}:{" "}
+          <span className="text-txt-hi">{summary.pct}%</span>
+        </span>
       </div>
-      <div className="overflow-hidden rounded-xl border border-border bg-background">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/30 text-left">
-              <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                Item
-              </th>
-              <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                Category
-              </th>
-              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                Have
-              </th>
-              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                Need
-              </th>
-              <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                Coverage
-              </th>
+
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 divide-x divide-line border-b border-line md:grid-cols-4">
+        <Tile label="TOTAL" value={String(resources.length)} tone="text-txt-hi" hint="tracked" />
+        <Tile label="STOCKED" value={String(fullyStocked)} tone="text-emerald-400" hint="have ≥ need" />
+        <Tile label="PARTIAL" value={String(partial)} tone="text-amber-400" hint="filling" />
+        <Tile label="CRITICAL" value={String(criticalShort)} tone="text-red-400" hint="urgent" />
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full font-mono text-sm">
+          <thead className="sticky top-0 bg-bg-2 text-[10px] uppercase tracking-[0.16em] text-txt-low">
+            <tr className="border-b border-line">
+              <th className="px-5 py-3 text-left">UNIT</th>
+              <th className="px-3 py-3 text-left">TYPE</th>
+              <th className="px-3 py-3 text-left">STATUS</th>
+              <th className="px-3 py-3 text-right">HAVE / NEED</th>
+              <th className="px-3 py-3 text-left">COVERAGE</th>
+              <th className="px-5 py-3 text-right">ACT</th>
             </tr>
           </thead>
-          <tbody>
-            {sorted.map((r) => (
+          <tbody className="divide-y divide-line">
+            {filtered.map((r) => (
               <ResourceRow key={r.id} resource={r} onUpdateHave={onUpdateHave} />
             ))}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  label,
+  activeTone,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  activeTone?: "brand";
+}) {
+  const activeCls =
+    activeTone === "brand" ? "bg-brand text-black" : "bg-txt-mid/15 text-txt-hi";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center rounded-sm px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] transition ${
+        active ? activeCls : "border border-line text-txt-mid hover:text-txt-hi"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Tile({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+  hint: string;
+}) {
+  return (
+    <div className="px-5 py-4 font-mono">
+      <div className="text-[10px] tracking-[0.2em] text-txt-low">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${tone}`}>{value}</div>
+      <div className="text-[11px] text-txt-low">{hint}</div>
     </div>
   );
 }
@@ -93,77 +155,64 @@ function ResourceRow({
   resource: Resource;
   onUpdateHave: (id: string, have: number) => void;
 }) {
-  const [local, setLocal] = useState(resource.have);
   const pct =
-    resource.need === 0
-      ? 100
-      : Math.min(100, Math.round((local / resource.need) * 100));
-  const barColor = pct >= 100 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-500" : "bg-rose-500";
+    resource.need === 0 ? 100 : Math.min(100, Math.round((resource.have / resource.need) * 100));
+  const status: "available" | "deployed" | "offline" =
+    pct >= 100 ? "available" : pct === 0 ? "offline" : "deployed";
+  const barColor =
+    pct >= 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
+  const isOffline = status === "offline";
 
-  function commit(next: number) {
-    const clamped = Math.max(0, Math.round(next));
-    setLocal(clamped);
-    onUpdateHave(resource.id, clamped);
+  function deploy() {
+    onUpdateHave(resource.id, Math.max(0, resource.have - 1));
+  }
+  function recall() {
+    onUpdateHave(resource.id, resource.have + 1);
   }
 
   return (
-    <tr className="border-b border-border/50 last:border-0 hover:bg-muted/20">
-      <td className="px-3 py-2">
+    <tr className="hover:bg-bg-3/40">
+      <td className={`px-5 py-3 ${isOffline ? "text-txt-low" : "text-txt-hi"}`}>
+        {resource.critical ? <span className="mr-1.5 text-red-400">●</span> : null}
+        {resource.name}
+      </td>
+      <td className="px-3 py-3 text-txt-mid">{resource.category}</td>
+      <td className="px-3 py-3">
+        <StatusChip status={status} />
+      </td>
+      <td className="px-3 py-3 text-right tabular-nums text-txt-mid">
+        <span className={isOffline ? "text-txt-low" : "text-txt-hi"}>{resource.have}</span>
+        <span className="text-txt-low"> / {resource.need}</span>
+        <span className="ml-1 text-[11px] text-txt-low">{resource.unit}</span>
+      </td>
+      <td className="px-3 py-3">
         <div className="flex items-center gap-2">
-          {resource.critical ? (
-            <span
-              className="inline-flex size-1.5 rounded-full bg-rose-500"
-              aria-label="critical"
-            />
-          ) : null}
-          <span className="font-medium text-foreground">{resource.name}</span>
-        </div>
-      </td>
-      <td className="px-3 py-2">
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ring-1 ring-inset ${resourceCategoryClass(resource.category)}`}
-        >
-          {resource.category}
-        </span>
-      </td>
-      <td className="px-3 py-2">
-        <div className="flex items-center justify-center gap-1">
-          <button
-            type="button"
-            onClick={() => commit(local - 1)}
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="decrease"
-          >
-            <Minus className="size-3" />
-          </button>
-          <span className="w-12 text-center font-mono tabular-nums">
-            {local}
-          </span>
-          <button
-            type="button"
-            onClick={() => commit(local + 1)}
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="increase"
-          >
-            <Plus className="size-3" />
-          </button>
-        </div>
-      </td>
-      <td className="px-3 py-2 text-center font-mono tabular-nums text-muted-foreground">
-        {resource.need} {resource.unit}
-      </td>
-      <td className="px-3 py-2">
-        <div className="flex items-center gap-2">
-          <div className="relative h-2 w-32 overflow-hidden rounded-full bg-muted">
-            <div
-              className={`absolute inset-y-0 left-0 ${barColor}`}
-              style={{ width: `${pct}%` }}
-            />
+          <div className="relative h-1.5 w-32 overflow-hidden bg-bg-3">
+            <div className={`absolute inset-y-0 left-0 ${barColor}`} style={{ width: `${pct}%` }} />
           </div>
-          <span className="font-mono text-xs tabular-nums text-muted-foreground">
-            {pct}%
-          </span>
+          <span className="text-[11px] tabular-nums text-txt-mid">{pct}%</span>
         </div>
+      </td>
+      <td className="px-5 py-3 text-right">
+        {isOffline ? (
+          <span className="text-[11px] text-txt-low">N/A</span>
+        ) : status === "deployed" ? (
+          <button
+            type="button"
+            onClick={recall}
+            className="text-[11px] font-semibold tracking-[0.12em] text-amber-400 hover:text-amber-300"
+          >
+            RECALL
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={deploy}
+            className="text-[11px] font-semibold tracking-[0.12em] text-brand hover:text-brand-3"
+          >
+            DEPLOY ›
+          </button>
+        )}
       </td>
     </tr>
   );

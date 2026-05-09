@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Plus_Jakarta_Sans, Spline_Sans_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { CopilotKitProviderShell } from "@/components/copilot/CopilotKitProviderShell";
 import { LocaleProvider } from "@/lib/i18n/context";
 import "./globals.css";
@@ -10,22 +10,24 @@ import "./globals.css";
 // and break the sidebar layout when both are loaded.
 import "@copilotkit/react-core/v2/styles.css";
 
-const jakarta = Plus_Jakarta_Sans({
+const inter = Inter({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-jakarta",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-inter",
 });
 
-const splineMono = Spline_Sans_Mono({
+const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-mono",
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains",
 });
 
 export const metadata: Metadata = {
-  title: "AG-UI Canvas | CopilotKit Hackathon Starter",
+  title: "CrisisOS — generative war-room",
   description:
-    "Hackathon starter kit: CopilotKit canvas + threads drawer + Deep Agents + Gemini + Notion MCP",
+    "CrisisOS — generative UI workspace for emergency management. Map, evac checklist, resources, alerts, timeline assembled in real time.",
 };
 
 export default function RootLayout({
@@ -34,8 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${jakarta.variable} ${splineMono.variable}`}>
-      <body className={`${jakarta.variable} ${splineMono.variable} subpixel-antialiased`}>
+    <html lang="en" className={`${inter.variable} ${jetbrains.variable} dark`}>
+      <body className={`${inter.variable} ${jetbrains.variable} subpixel-antialiased`}>
         <LocaleProvider>
           <CopilotKitProviderShell>{children}</CopilotKitProviderShell>
         </LocaleProvider>
