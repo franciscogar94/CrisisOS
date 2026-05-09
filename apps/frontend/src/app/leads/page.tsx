@@ -214,14 +214,29 @@ function useLiveAgentState() {
   const ctx = useContext(MockOverrideContext);
   const mockOverride = ctx?.mockOverride ?? null;
   const setMockOverride = ctx?.setMockOverride;
+
+  // Optimistic local override: keeps UI responsive when the agent is offline,
+  // not yet migrated to the crisis schema, or slow to echo state mutations
+  // back over the stream. Cleared on next agent state emission so the server
+  // remains the source of truth once it catches up.
+  const [localOverride, setLocalOverride] = useState<AgentState | null>(null);
+
   const baseState = mergeAgentState(agent?.state);
-  const state = mockOverride ?? baseState;
+  const state = mockOverride ?? localOverride ?? baseState;
+
+  useEffect(() => {
+    if (localOverride !== null && agent?.state) setLocalOverride(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent?.state]);
+
   const setState = (updater: (prev: AgentState) => AgentState) => {
     if (mockOverride !== null && setMockOverride) {
       setMockOverride((prev) => updater(prev ?? mockOverride));
       return;
     }
-    agent?.setState(updater(mergeAgentState(agent?.state)));
+    const next = updater(state);
+    setLocalOverride(next);
+    agent?.setState(next);
   };
   return { agent, state, setState };
 }
