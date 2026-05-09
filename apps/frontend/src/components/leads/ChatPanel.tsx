@@ -7,8 +7,15 @@ import {
   useSuggestions,
 } from "@copilotkit/react-core/v2";
 
+const INITIALS_KEY = "crisisos.userInitials";
+const DEFAULT_INITIALS = "YO";
+
 function uid() {
   return `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeInitials(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase();
 }
 
 export function ChatPanel() {
@@ -17,7 +24,24 @@ export function ChatPanel() {
   });
   const { suggestions } = useSuggestions();
   const [draft, setDraft] = useState("");
+  const [initials, setInitials] = useState(DEFAULT_INITIALS);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(INITIALS_KEY);
+    const next = normalizeInitials(saved ?? "");
+    if (next) setInitials(next);
+  }, []);
+
+  function editInitials() {
+    if (typeof window === "undefined") return;
+    const input = window.prompt("Tus iniciales (máx 2 caracteres):", initials);
+    if (input === null) return;
+    const next = normalizeInitials(input) || DEFAULT_INITIALS;
+    setInitials(next);
+    window.localStorage.setItem(INITIALS_KEY, next);
+  }
 
   const messages = (agent?.messages ?? []) as Array<{
     id: string;
@@ -131,7 +155,7 @@ export function ChatPanel() {
         ) : (
           visible.map((m) =>
             m.role === "user" ? (
-              <UserBubble key={m.id} text={asText(m.content)} />
+              <UserBubble key={m.id} text={asText(m.content)} initials={initials} onEdit={editInitials} />
             ) : (
               <AssistantBubble key={m.id} text={asText(m.content)} toolCalls={m.toolCalls} />
             ),
@@ -167,12 +191,26 @@ export function ChatPanel() {
   );
 }
 
-function UserBubble({ text }: { text: string }) {
+function UserBubble({
+  text,
+  initials,
+  onEdit,
+}: {
+  text: string;
+  initials: string;
+  onEdit: () => void;
+}) {
   return (
     <div className="flex gap-3">
-      <div className="flex size-7 shrink-0 items-center justify-center border border-line-strong font-mono text-[10px] text-txt-low">
-        FG
-      </div>
+      <button
+        type="button"
+        onClick={onEdit}
+        title="Editar iniciales"
+        aria-label="editar iniciales"
+        className="flex size-7 shrink-0 items-center justify-center border border-line-strong font-mono text-[10px] text-txt-low transition hover:border-brand hover:text-txt-hi"
+      >
+        {initials}
+      </button>
       <div className="flex-1 text-txt-mid">{text}</div>
     </div>
   );
