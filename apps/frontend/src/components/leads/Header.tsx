@@ -1,71 +1,180 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
-import type { SyncMeta } from "@/lib/leads/types";
+import { useEffect, useState } from "react";
+import type { Crisis } from "@/lib/leads/types";
+import { useLocale } from "@/lib/i18n/context";
+import { LocaleToggle } from "@/components/LocaleToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface HeaderProps {
   title: string;
   subtitle: string;
-  totalLeads: number;
-  visibleLeads: number;
-  sync: SyncMeta;
+  crisis: Crisis | null;
+  weatherTemp?: number | null;
+  weatherDesc?: string | null;
+  onOpenChat?: () => void;
+  onOpenThreads?: () => void;
+  mobileView?: "canvas" | "chat";
 }
 
 export function Header({
   title,
   subtitle,
-  totalLeads,
-  visibleLeads,
-  sync,
+  crisis,
+  weatherTemp,
+  weatherDesc,
+  onOpenChat,
+  onOpenThreads,
+  mobileView = "canvas",
 }: HeaderProps) {
-  const isLocalMode = sync.databaseTitle?.startsWith("Local:") ?? false;
+  const { t } = useLocale();
+  const isCritical = crisis?.severity === "critical";
+  const elapsed = useElapsed(crisis?.timestamp);
+
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 pb-5">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          {title}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-        <span className="tabular-nums">
-          <span className="font-semibold text-foreground">{visibleLeads}</span>
-          {visibleLeads !== totalLeads ? (
-            <span className="text-muted-foreground"> / {totalLeads}</span>
-          ) : null}{" "}
-          leads
+    <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-line bg-bg-2 px-3 sm:px-5">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        {onOpenThreads ? (
+          <button
+            type="button"
+            onClick={onOpenThreads}
+            aria-label="open threads"
+            className="-ml-1 flex size-9 items-center justify-center text-txt-mid transition hover:text-txt-hi md:hidden"
+          >
+            ☰
+          </button>
+        ) : null}
+        <Diamond pulse={isCritical} />
+        <span className="font-mono text-xs tracking-[0.24em] text-txt-hi">CRISISOS</span>
+        <span className="hidden sm:inline-flex">
+          <StatusBadge crisis={crisis} />
         </span>
-        {sync.databaseTitle ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-1 rounded-full bg-muted-foreground/50" />
-            <span className="normal-case tracking-normal">
-              {isLocalMode
-                ? sync.databaseTitle
-                : `Notion: ${sync.databaseTitle}`}
-            </span>
+        {crisis ? (
+          <span className="hidden truncate text-xs text-txt-mid sm:inline">
+            {title} — {crisis.location.name ?? `${crisis.location.lat.toFixed(2)}, ${crisis.location.lng.toFixed(2)}`}
+          </span>
+        ) : (
+          <span className="hidden truncate text-xs text-txt-low sm:inline">{subtitle}</span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 font-mono text-[11px] text-txt-mid sm:gap-3">
+        {crisis && elapsed ? (
+          <span className="hidden text-amber-700 dark:text-amber-400 sm:inline">T+ {elapsed}</span>
+        ) : null}
+        {crisis && elapsed ? (
+          <span className="hidden sm:inline">
+            <Pipe />
           </span>
         ) : null}
-        {sync.syncedAt ? (
-          <span className="inline-flex items-center gap-1.5">
-            <RefreshCw className="size-3" />
-            {formatRelative(sync.syncedAt)}
-          </span>
+        {weatherTemp != null ? (
+          <>
+            <span className="hidden items-center gap-1.5 lg:inline-flex">
+              <span className="inline-block size-1.5 rounded-full bg-amber-500" />
+              {Math.round(weatherTemp)}°C
+              {weatherDesc ? (
+                <span className="max-w-[140px] truncate text-txt-low">· {weatherDesc}</span>
+              ) : null}
+            </span>
+            <span className="hidden lg:inline">
+              <Pipe />
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="hidden items-center gap-1.5 sm:inline-flex">
+              <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+              {t("header.agent_online") || "AGENT ONLINE"}
+            </span>
+            <span className="hidden sm:inline">
+              <Pipe />
+            </span>
+          </>
+        )}
+        <span className="hidden sm:inline-flex">
+          <ThemeToggle />
+        </span>
+        <span className="hidden sm:inline-flex">
+          <LocaleToggle />
+        </span>
+        {onOpenChat ? (
+          <button
+            type="button"
+            onClick={onOpenChat}
+            aria-label={mobileView === "chat" ? "show canvas" : "show chat"}
+            className="flex size-9 items-center justify-center border border-line text-txt-mid transition hover:border-brand hover:text-txt-hi md:hidden"
+          >
+            {mobileView === "chat" ? "▢" : "💬"}
+          </button>
         ) : null}
       </div>
     </header>
   );
 }
 
-function formatRelative(iso: string): string {
-  try {
-    const ts = new Date(iso).getTime();
-    if (Number.isNaN(ts)) return "synced";
-    const seconds = Math.floor((Date.now() - ts) / 1000);
-    if (seconds < 60) return "just now";
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return new Date(iso).toLocaleDateString();
-  } catch {
-    return "synced";
+function Pipe() {
+  return <span className="text-line-strong">|</span>;
+}
+
+function Diamond({ pulse }: { pulse: boolean }) {
+  return (
+    <div
+      className={`flex size-5 rotate-45 items-center justify-center border-2 border-brand ${
+        pulse ? "pulse-crit" : ""
+      }`}
+    >
+      <div className="size-1.5 bg-brand" />
+    </div>
+  );
+}
+
+function StatusBadge({ crisis }: { crisis: Crisis | null }) {
+  if (!crisis) {
+    return (
+      <span className="inline-flex items-center rounded-sm border border-line-strong px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-txt-mid">
+        STANDBY
+      </span>
+    );
   }
+  if (crisis.severity === "critical") {
+    return (
+      <span className="inline-flex items-center rounded-sm bg-red-500 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-black">
+        CRITICAL · ACTIVE
+      </span>
+    );
+  }
+  if (crisis.severity === "high") {
+    return (
+      <span className="inline-flex items-center rounded-sm bg-amber-500 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-black">
+        HIGH · ACTIVE
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-sm bg-brand px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-black">
+      ACTIVE
+    </span>
+  );
+}
+
+function useElapsed(timestamp: string | undefined): string | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!timestamp) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [timestamp]);
+  if (!timestamp) return null;
+  const start = new Date(timestamp).getTime();
+  if (Number.isNaN(start)) return null;
+  const diff = Math.max(0, now - start);
+  const total = Math.floor(diff / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function pad(n: number) {
+  return n.toString().padStart(2, "0");
 }
