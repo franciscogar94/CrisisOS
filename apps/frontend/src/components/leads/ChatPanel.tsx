@@ -64,14 +64,35 @@ export function ChatPanel() {
         <span className="tracking-[0.24em] text-txt-low">// COPILOT</span>
         <div className="flex items-center gap-3">
           {!empty ? (
-            <button
-              type="button"
-              onClick={() => agent?.setMessages([])}
-              className="text-txt-low transition hover:text-txt-hi"
-              title="Start a new conversation"
-            >
-              + NUEVO
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isRunning || !agent) return;
+                  const all = (agent.messages ?? []) as Array<{ role: string }>;
+                  let cut = all.length;
+                  while (cut > 0 && all[cut - 1].role !== "user") cut--;
+                  if (cut > 0 && all[cut - 1].role === "user") cut--;
+                  (agent as { setMessages: (m: unknown[]) => void }).setMessages(
+                    all.slice(0, cut),
+                  );
+                }}
+                disabled={isRunning}
+                className="text-txt-low transition hover:text-txt-hi disabled:opacity-40 disabled:hover:text-txt-low"
+                title="Undo last turn"
+                aria-label="undo last turn"
+              >
+                ↶ ATRÁS
+              </button>
+              <button
+                type="button"
+                onClick={() => agent?.setMessages([])}
+                className="text-txt-low transition hover:text-txt-hi"
+                title="Reset conversation"
+              >
+                + RESET
+              </button>
+            </>
           ) : null}
           {isRunning ? (
             <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
