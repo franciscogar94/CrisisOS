@@ -47,7 +47,9 @@ import { EmailDraftCard } from "@/components/leads/inline/EmailDraftCard";
 import { MockControls } from "@/components/leads/MockControls";
 import { ToolFallbackCard } from "@/components/copilot/ToolFallbackCard";
 
-const MOCK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK === "1";
+const MOCK_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_MOCK === "1" ||
+  process.env.NODE_ENV === "development";
 
 const MockOverrideContext = createContext<{
   mockOverride: AgentState | null;
@@ -578,7 +580,7 @@ function CanvasBody() {
 
   return (
     <>
-      <main className="flex h-screen flex-col gap-5 overflow-hidden bg-background px-6 py-6">
+      <main className="flex h-screen flex-col gap-5 overflow-y-auto bg-background px-6 py-6">
         <div className="flex items-start justify-between gap-3">
           <Header
             title={state.header.title}
@@ -612,7 +614,7 @@ function CanvasBody() {
               <StatusDonut checklist={state.checklist} />
               <WorkshopDemand resources={state.resources} compact />
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="flex min-h-[480px] flex-1 flex-col">
               <PipelineBoard
                 state={state}
                 onModuleChange={setActiveModule}
