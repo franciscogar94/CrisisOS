@@ -43,9 +43,7 @@ import { EmailDraftCard } from "@/components/leads/inline/EmailDraftCard";
 import { MockControls } from "@/components/leads/MockControls";
 import { ToolFallbackCard } from "@/components/copilot/ToolFallbackCard";
 
-const MOCK_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_MOCK === "1" ||
-  process.env.NODE_ENV === "development";
+const MOCK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK === "1";
 
 const MockOverrideContext = createContext<{
   mockOverride: AgentState | null;

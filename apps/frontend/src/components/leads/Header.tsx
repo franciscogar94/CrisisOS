@@ -44,7 +44,7 @@ export function Header({
 
       <div className="flex items-center gap-3 font-mono text-[11px] text-txt-mid">
         {crisis && elapsed ? (
-          <span className="text-amber-400">T+ {elapsed}</span>
+          <span className="text-amber-700 dark:text-amber-400">T+ {elapsed}</span>
         ) : null}
         {crisis && elapsed ? <Pipe /> : null}
         {weatherTemp != null ? (

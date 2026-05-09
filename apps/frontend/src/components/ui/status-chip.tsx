@@ -13,16 +13,26 @@ export type Status =
   | "unknown";
 
 const STYLES: Record<Status, string> = {
-  available: "bg-emerald-500/15 text-emerald-400",
-  done: "bg-emerald-500/15 text-emerald-400",
-  operational: "bg-emerald-500/15 text-emerald-400",
-  deployed: "bg-amber-500/15 text-amber-400",
-  "in-progress": "bg-amber-500/15 text-amber-400",
-  degraded: "bg-amber-500/15 text-amber-400",
-  pending: "bg-zinc-800 text-zinc-400",
-  offline: "bg-zinc-800 text-zinc-500",
-  outage: "bg-red-500/15 text-red-400",
-  unknown: "bg-zinc-800 text-zinc-400",
+  available:
+    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  done:
+    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  operational:
+    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  deployed:
+    "bg-amber-500/20 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
+  "in-progress":
+    "bg-amber-500/20 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
+  degraded:
+    "bg-amber-500/20 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
+  pending:
+    "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+  offline:
+    "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
+  outage:
+    "bg-red-500/15 text-red-700 dark:text-red-400",
+  unknown:
+    "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
 };
 
 export function StatusChip({

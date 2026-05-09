@@ -215,10 +215,26 @@ export function CrisisMap({
       {/* Mini stats (bottom-left) */}
       {crisis ? (
         <div className="pointer-events-auto absolute bottom-4 left-4 z-[400] grid grid-cols-4 divide-x divide-line border border-line bg-bg-2/95 backdrop-blur-sm">
-          <Stat label="AFFECTED" value={fmt(affectedCount)} tone="text-red-400" />
-          <Stat label="EVACUATED" value={fmt(evacuatedCount)} tone="text-amber-400" />
-          <Stat label="SHELTERED" value={fmt(shelteredCount)} tone="text-emerald-400" />
-          <Stat label="ETA STABLE" value={etaStable ?? "—"} tone="text-sky-400" />
+          <Stat
+            label="AFFECTED"
+            value={fmt(affectedCount)}
+            tone="text-red-700 dark:text-red-400"
+          />
+          <Stat
+            label="EVACUATED"
+            value={fmt(evacuatedCount)}
+            tone="text-amber-700 dark:text-amber-400"
+          />
+          <Stat
+            label="SHELTERED"
+            value={fmt(shelteredCount)}
+            tone="text-emerald-700 dark:text-emerald-400"
+          />
+          <Stat
+            label="ETA STABLE"
+            value={etaStable ?? "—"}
+            tone="text-sky-700 dark:text-sky-400"
+          />
         </div>
       ) : null}
 

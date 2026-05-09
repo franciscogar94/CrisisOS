@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 export type Priority = "urgent" | "high" | "med" | "low";
 
 const STYLES: Record<Priority, string> = {
-  urgent: "bg-amber-500/15 text-amber-400",
-  high: "bg-zinc-800 text-zinc-300",
-  med: "bg-zinc-800 text-zinc-400",
-  low: "bg-zinc-800/60 text-zinc-500",
+  urgent: "bg-amber-500/20 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
+  high: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  med: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+  low: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-500",
 };
 
 const LABEL: Record<Priority, string> = {
