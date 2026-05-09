@@ -1,8 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import type { ChecklistItem } from "@/lib/leads/types";
+import type { ChecklistItem, ChecklistPriority } from "@/lib/leads/types";
 import { CHECKLIST_PRIORITIES } from "@/lib/leads/types";
+import { useLocale } from "@/lib/i18n/context";
+
+const PRIORITY_KEY: Record<ChecklistPriority, string> = {
+  immediate: "priority.immediate",
+  "short-term": "priority.short",
+  "long-term": "priority.long",
+};
 
 export interface StatusDonutProps {
   checklist: ChecklistItem[];
@@ -17,6 +24,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 const TRACK = "#F0F0F4";
 
 export function StatusDonut({ checklist }: StatusDonutProps) {
+  const { t } = useLocale();
   const segments = useMemo(() => {
     const counts = new Map<string, { total: number; done: number }>();
     for (const p of CHECKLIST_PRIORITIES) counts.set(p, { total: 0, done: 0 });
@@ -101,14 +109,14 @@ export function StatusDonut({ checklist }: StatusDonutProps) {
               textTransform: "uppercase",
             }}
           >
-            done
+            {t("donut.done")}
           </text>
         </svg>
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          checklist progress
+          {t("donut.title")}
         </div>
         <ul className="mt-2 grid gap-1.5">
           {segments.map((seg) => {
@@ -120,8 +128,8 @@ export function StatusDonut({ checklist }: StatusDonutProps) {
                   style={{ background: PRIORITY_COLOR[seg.priority] ?? "#BEC2FF" }}
                   aria-hidden
                 />
-                <span className="min-w-0 flex-1 truncate text-foreground capitalize">
-                  {seg.priority.replace("-", " ")}
+                <span className="min-w-0 flex-1 truncate text-foreground">
+                  {t(PRIORITY_KEY[seg.priority as ChecklistPriority])}
                 </span>
                 <span className="font-mono text-[12px] text-muted-foreground">
                   {seg.done}/{seg.total}

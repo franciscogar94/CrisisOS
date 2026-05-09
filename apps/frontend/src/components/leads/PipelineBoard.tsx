@@ -6,6 +6,7 @@ import type { ActiveModule, AgentState } from "@/lib/leads/types";
 import { LeadCard } from "@/components/leads/LeadCard";
 import { EvacuationChecklist } from "@/components/leads/EvacuationChecklist";
 import { ResourceTable } from "@/components/leads/ResourceTable";
+import { useLocale } from "@/lib/i18n/context";
 
 const CrisisMap = dynamic(
   () => import("@/components/leads/CrisisMap").then((m) => m.CrisisMap),
@@ -23,15 +24,15 @@ export interface ModuleTabsProps {
 
 const TABS: ReadonlyArray<{
   id: ActiveModule;
-  label: string;
+  labelKey: string;
   icon: typeof MapIcon;
 }> = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "map", label: "Map", icon: MapIcon },
-  { id: "checklist", label: "Checklist", icon: ListChecks },
-  { id: "resources", label: "Resources", icon: Package },
-  { id: "timeline", label: "Timeline", icon: Clock },
-  { id: "alerts", label: "Alerts", icon: AlertOctagon },
+  { id: "overview", labelKey: "tabs.overview", icon: LayoutDashboard },
+  { id: "map", labelKey: "tabs.map", icon: MapIcon },
+  { id: "checklist", labelKey: "tabs.checklist", icon: ListChecks },
+  { id: "resources", labelKey: "tabs.resources", icon: Package },
+  { id: "timeline", labelKey: "tabs.timeline", icon: Clock },
+  { id: "alerts", labelKey: "tabs.alerts", icon: AlertOctagon },
 ];
 
 export function PipelineBoard({
@@ -43,21 +44,22 @@ export function PipelineBoard({
   onToggleTimelineEntry,
 }: ModuleTabsProps) {
   const active = state.activeModule;
+  const { t } = useLocale();
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card shadow-sm">
       <nav
         role="tablist"
         className="flex flex-wrap items-center gap-1 border-b border-border px-2 py-2"
       >
-        {TABS.map((t) => {
-          const isActive = active === t.id;
-          const Icon = t.icon;
+        {TABS.map((tab) => {
+          const isActive = active === tab.id;
+          const Icon = tab.icon;
           return (
             <button
-              key={t.id}
+              key={tab.id}
               role="tab"
               aria-selected={isActive}
-              onClick={() => onModuleChange(t.id)}
+              onClick={() => onModuleChange(tab.id)}
               className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
                 isActive
                   ? "bg-foreground text-background"
@@ -65,7 +67,7 @@ export function PipelineBoard({
               }`}
             >
               <Icon className="size-3.5" />
-              {t.label}
+              {t(tab.labelKey)}
             </button>
           );
         })}
@@ -107,20 +109,19 @@ export function PipelineBoard({
 function MapPlaceholder() {
   return (
     <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-      Loading map…
+      …
     </div>
   );
 }
 
 function OverviewModule({ state }: { state: AgentState }) {
+  const { t } = useLocale();
   if (!state.crisis) {
     return (
       <div className="flex w-full items-center justify-center py-16 text-center">
         <div>
-          <p className="text-base font-medium text-foreground">No active crisis.</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Describe an emergency in the chat to generate your operations center.
-          </p>
+          <p className="text-base font-medium text-foreground">{t("empty.title")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("empty.body")}</p>
         </div>
       </div>
     );
@@ -132,20 +133,22 @@ function OverviewModule({ state }: { state: AgentState }) {
     <div className="grid w-full gap-4 lg:grid-cols-2">
       <div className="rounded-xl border border-border bg-background p-4">
         <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          situation
+          {t("overview.situation")}
         </div>
         <h3 className="mt-2 text-lg font-semibold text-foreground">
           {crisis.title}
         </h3>
         <p className="mt-2 text-sm text-muted-foreground">{crisis.description}</p>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          <dt className="text-muted-foreground">Type</dt>
-          <dd className="capitalize text-foreground">{crisis.type}</dd>
-          <dt className="text-muted-foreground">Severity</dt>
-          <dd className="capitalize text-foreground">{crisis.severity}</dd>
-          <dt className="text-muted-foreground">Affected radius</dt>
-          <dd className="text-foreground">{crisis.affectedRadius} km</dd>
-          <dt className="text-muted-foreground">Reported</dt>
+          <dt className="text-muted-foreground">{t("overview.field.type")}</dt>
+          <dd className="text-foreground">{t(`type.${crisis.type}`)}</dd>
+          <dt className="text-muted-foreground">{t("overview.field.severity")}</dt>
+          <dd className="text-foreground">{t(`severity.${crisis.severity}`)}</dd>
+          <dt className="text-muted-foreground">{t("overview.field.radius")}</dt>
+          <dd className="text-foreground">
+            {t("common.km", { n: crisis.affectedRadius })}
+          </dd>
+          <dt className="text-muted-foreground">{t("overview.field.reported")}</dt>
           <dd className="text-foreground">
             {new Date(crisis.timestamp).toLocaleString()}
           </dd>
@@ -154,10 +157,10 @@ function OverviewModule({ state }: { state: AgentState }) {
       <div className="grid gap-3">
         <div className="rounded-xl border border-border bg-background p-4">
           <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            nearest open safe zones
+            {t("overview.zones")}
           </div>
           {openZones.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">None located yet.</p>
+            <p className="mt-2 text-sm text-muted-foreground">{t("common.no_data")}</p>
           ) : (
             <ul className="mt-2 grid gap-2">
               {openZones.slice(0, 4).map((z) => (
@@ -170,16 +173,16 @@ function OverviewModule({ state }: { state: AgentState }) {
         </div>
         <div className="rounded-xl border border-border bg-background p-4">
           <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            active outages
+            {t("overview.outages")}
           </div>
           {outageAlerts.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">No outages reported.</p>
+            <p className="mt-2 text-sm text-muted-foreground">{t("common.no_data")}</p>
           ) : (
             <ul className="mt-2 grid gap-1.5 text-sm">
               {outageAlerts.map((a) => (
                 <li key={a.id} className="flex items-start gap-2">
                   <span className="mt-1 size-2 shrink-0 rounded-full bg-rose-500" />
-                  <span className="capitalize text-foreground">{a.service}:</span>
+                  <span className="text-foreground">{t(`service.${a.service}`)}:</span>
                   <span className="text-muted-foreground">{a.message}</span>
                 </li>
               ))}
@@ -198,18 +201,19 @@ function TimelineModule({
   entries: AgentState["timeline"];
   onToggle: (id: string) => void;
 }) {
+  const { t } = useLocale();
   if (entries.length === 0) {
     return (
       <div className="flex w-full items-center justify-center text-sm text-muted-foreground">
-        No timeline yet.
+        —
       </div>
     );
   }
-  const phases: Array<{ id: AgentState["timeline"][number]["phase"]; label: string }> = [
-    { id: "first_5_min", label: "First 5 minutes" },
-    { id: "first_hour", label: "First hour" },
-    { id: "first_day", label: "First day" },
-    { id: "first_week", label: "First week" },
+  const phases: Array<{ id: AgentState["timeline"][number]["phase"]; labelKey: string }> = [
+    { id: "first_5_min", labelKey: "phase.first_5_min" },
+    { id: "first_hour", labelKey: "phase.first_hour" },
+    { id: "first_day", labelKey: "phase.first_day" },
+    { id: "first_week", labelKey: "phase.first_week" },
   ];
   return (
     <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -221,7 +225,7 @@ function TimelineModule({
             className="rounded-xl border border-border bg-background p-3"
           >
             <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-              {p.label}
+              {t(p.labelKey)}
             </div>
             <ul className="mt-2 grid gap-1.5">
               {phaseEntries.length === 0 ? (
@@ -258,10 +262,11 @@ function TimelineModule({
 }
 
 function AlertsModule({ state }: { state: AgentState }) {
+  const { t } = useLocale();
   if (state.alerts.length === 0) {
     return (
       <div className="flex w-full items-center justify-center text-sm text-muted-foreground">
-        No alerts yet.
+        —
       </div>
     );
   }
@@ -285,11 +290,11 @@ function AlertsModule({ state }: { state: AgentState }) {
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium capitalize text-foreground">
-                {a.service}
+              <span className="text-sm font-medium text-foreground">
+                {t(`service.${a.service}`)}
               </span>
               <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                {a.status}
+                {t(`service_status.${a.status}`)}
               </span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{a.message}</p>
