@@ -1,100 +1,205 @@
-export type TechLevel =
-  | "Non-technical"
-  | "Some technical"
-  | "Developer"
-  | "Advanced / expert";
+// Crisis Manager — type definitions
+// Shared contract with apps/agent/src/lead_state.py (CrisisCanvasState)
 
-export type Workshop =
-  | "Agentic UI (AG-UI)"
-  | "MCP Apps / Tooling"
-  | "RAG & Data Chat"
-  | "Evaluations & Guardrails"
-  | "Deploying Agents (prod)"
-  | "Not sure yet";
+export type CrisisSeverity = "low" | "moderate" | "high" | "critical";
 
-export type Source =
-  | "Website"
-  | "Referral"
-  | "LinkedIn"
-  | "X/Twitter"
-  | "Event"
-  | "Other";
+export type CrisisType =
+  | "earthquake"
+  | "flood"
+  | "fire"
+  | "hurricane"
+  | "tornado"
+  | "tsunami"
+  | "chemical"
+  | "other";
 
-export type LeadStatus = "Not started" | "In progress" | "Done";
+export type ServiceStatus =
+  | "operational"
+  | "degraded"
+  | "outage"
+  | "unknown";
 
-export const STATUSES: readonly LeadStatus[] = [
-  "Not started",
-  "In progress",
-  "Done",
+export type ChecklistPriority = "immediate" | "short-term" | "long-term";
+
+export type SafeZoneType =
+  | "shelter"
+  | "hospital"
+  | "fire_station"
+  | "police"
+  | "assembly_point";
+
+export type SafeZoneStatus = "open" | "full" | "closed";
+
+export type ResourceCategory =
+  | "water"
+  | "food"
+  | "medical"
+  | "shelter"
+  | "communication"
+  | "transport"
+  | "tools";
+
+export type ServiceType =
+  | "water"
+  | "electricity"
+  | "gas"
+  | "communications"
+  | "internet"
+  | "transport";
+
+export type TimelinePhase =
+  | "first_5_min"
+  | "first_hour"
+  | "first_day"
+  | "first_week";
+
+export type ActiveModule =
+  | "overview"
+  | "map"
+  | "checklist"
+  | "resources"
+  | "timeline"
+  | "alerts";
+
+export const SEVERITIES: readonly CrisisSeverity[] = [
+  "low",
+  "moderate",
+  "high",
+  "critical",
 ] as const;
 
-export const WORKSHOPS: readonly Workshop[] = [
-  "Agentic UI (AG-UI)",
-  "MCP Apps / Tooling",
-  "RAG & Data Chat",
-  "Evaluations & Guardrails",
-  "Deploying Agents (prod)",
-  "Not sure yet",
+export const CRISIS_TYPES: readonly CrisisType[] = [
+  "earthquake",
+  "flood",
+  "fire",
+  "hurricane",
+  "tornado",
+  "tsunami",
+  "chemical",
+  "other",
 ] as const;
 
-export const TECH_LEVELS: readonly TechLevel[] = [
-  "Non-technical",
-  "Some technical",
-  "Developer",
-  "Advanced / expert",
+export const CHECKLIST_PRIORITIES: readonly ChecklistPriority[] = [
+  "immediate",
+  "short-term",
+  "long-term",
 ] as const;
 
-export interface Lead {
-  id: string;
-  url?: string;
-  name: string;
-  company: string;
-  email: string;
-  role: string;
-  phone?: string;
-  source?: string;
-  technical_level: string;
-  interested_in: string[];
-  tools: string[];
-  workshop: string;
-  status: string;
-  opt_in: boolean;
-  message: string;
-  submitted_at: string;
+export const RESOURCE_CATEGORIES: readonly ResourceCategory[] = [
+  "water",
+  "food",
+  "medical",
+  "shelter",
+  "communication",
+  "transport",
+  "tools",
+] as const;
+
+export const SAFE_ZONE_TYPES: readonly SafeZoneType[] = [
+  "shelter",
+  "hospital",
+  "fire_station",
+  "police",
+  "assembly_point",
+] as const;
+
+export const TIMELINE_PHASES: readonly TimelinePhase[] = [
+  "first_5_min",
+  "first_hour",
+  "first_day",
+  "first_week",
+] as const;
+
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+  name?: string;
 }
 
-export interface LeadFilter {
-  workshops: string[];
-  technical_levels: string[];
-  tools: string[];
-  opt_in: "any" | "yes" | "no";
+export interface Crisis {
+  id: string;
+  type: CrisisType;
+  severity: CrisisSeverity;
+  title: string;
+  description: string;
+  location: GeoPoint;
+  affectedRadius: number;
+  timestamp: string;
+  updatedAt?: string;
+}
+
+export interface SafeZone {
+  id: string;
+  name: string;
+  type: SafeZoneType;
+  location: GeoPoint;
+  capacity?: number;
+  status: SafeZoneStatus;
+  distance?: number;
+  phone?: string;
+  notes?: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  checked: boolean;
+  priority: ChecklistPriority;
+  category: string;
+}
+
+export interface Resource {
+  id: string;
+  name: string;
+  category: ResourceCategory;
+  have: number;
+  need: number;
+  unit: string;
+  critical: boolean;
+}
+
+export interface ServiceAlert {
+  id: string;
+  service: ServiceType;
+  status: ServiceStatus;
+  message: string;
+  updatedAt: string;
+}
+
+export interface TimelineEntry {
+  id: string;
+  phase: TimelinePhase;
+  action: string;
+  completed: boolean;
+  order: number;
+}
+
+export interface WeatherData {
+  temperature: number;
+  windSpeed: number;
+  humidity: number;
+  description: string;
+  alerts: string[];
+}
+
+export interface CrisisFilter {
+  resourceCategories: string[];
+  checklistPriorities: string[];
+  safeZoneTypes: string[];
   search: string;
 }
 
-export interface SyncMeta {
-  databaseId: string;
-  databaseTitle: string;
-  syncedAt: string | null;
-}
-
 export interface AgentState {
-  leads: Lead[];
-  filter: LeadFilter;
-  highlightedLeadIds: string[];
-  selectedLeadId: string | null;
+  crisis: Crisis | null;
+  safeZones: SafeZone[];
+  checklist: ChecklistItem[];
+  resources: Resource[];
+  alerts: ServiceAlert[];
+  timeline: TimelineEntry[];
+  weather: WeatherData | null;
+  filter: CrisisFilter;
+  highlightedZoneIds: string[];
+  selectedZoneId: string | null;
   header: { title: string; subtitle: string };
-  sync: SyncMeta;
-}
-
-// Mirrors the Python `NotionHealth` TypedDict in
-// agent/src/notion_integration.py. Returned by the agent's
-// `notion_health_check` tool when the user pings the Notion DB.
-export interface NotionHealth {
-  user_id: string;
-  db_title: string;
-  row_count: number;
-  expected_props: string[];
-  actual_props: string[];
-  missing_props: string[];
-  error: string | null;
+  activeModule: ActiveModule;
 }
