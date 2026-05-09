@@ -7,6 +7,7 @@ import {
   checklistProgress,
   resourceDeficit,
 } from "@/lib/leads/derive";
+import { useLocale } from "@/lib/i18n/context";
 
 export interface QuickStatsProps {
   state: AgentState;
@@ -27,6 +28,7 @@ const ACCENT: Record<Tile["accent"], string> = {
 };
 
 export function QuickStats({ state }: QuickStatsProps) {
+  const { t } = useLocale();
   const tiles = useMemo<Tile[]>(() => {
     const safeZones = state.safeZones.length;
     const openZones = state.safeZones.filter((z) => z.status === "open").length;
@@ -37,40 +39,49 @@ export function QuickStats({ state }: QuickStatsProps) {
 
     return [
       {
-        label: "safe zones",
+        label: t("stats.safeZones"),
         value: safeZones.toString(),
         meta:
           safeZones === 0
-            ? "none located"
-            : `${openZones} open / ${safeZones} total`,
+            ? "—"
+            : t("stats.zones.summary", { open: openZones, total: safeZones }),
         accent: "lilac",
       },
       {
-        label: "checklist",
+        label: t("stats.checklist"),
         value: `${checklist.pct}%`,
-        meta: checklist.total === 0 ? "no items" : `${checklist.done} / ${checklist.total} done`,
+        meta:
+          checklist.total === 0
+            ? "—"
+            : t("stats.checklist.summary", {
+                done: checklist.done,
+                total: checklist.total,
+              }),
         accent: "mint",
       },
       {
-        label: "resources",
+        label: t("stats.resources"),
         value: `${resources.pct}%`,
         meta:
           resources.criticalShort > 0
-            ? `${resources.criticalShort} critical short`
-            : "supplies covered",
+            ? t("stats.resources.summary", { n: resources.criticalShort })
+            : "—",
         accent: "blue",
       },
       {
-        label: "service alerts",
+        label: t("stats.alerts"),
         value: (alerts.outage + alerts.degraded).toString(),
         meta:
           alerts.outage === 0 && alerts.degraded === 0
-            ? "all operational"
-            : `${alerts.outage} outage, ${alerts.degraded} degraded`,
+            ? "—"
+            : t("stats.alerts.summary", {
+                outage: alerts.outage,
+                degraded: alerts.degraded,
+              }),
         accent: "orange",
       },
     ];
-  }, [state]);
+  }, [state, t]);
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

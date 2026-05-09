@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { Resource, ResourceCategory } from "@/lib/leads/types";
 import { resourceCategoryClass } from "@/lib/leads/derive";
+import { useLocale } from "@/lib/i18n/context";
 
 export interface ResourceBarsProps {
   resources: Resource[];
@@ -24,6 +25,7 @@ export function WorkshopDemand({
   onPickCategory,
   compact,
 }: ResourceBarsProps) {
+  const { t } = useLocale();
   const aggregates = useMemo<CategoryAgg[]>(() => {
     const map = new Map<ResourceCategory, { have: number; need: number }>();
     for (const r of resources) {
@@ -46,12 +48,10 @@ export function WorkshopDemand({
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-        resource coverage
+        {t("resources.title")}
       </div>
       {aggregates.length === 0 ? (
-        <div className="mt-3 text-sm text-muted-foreground">
-          No resources tracked yet.
-        </div>
+        <div className="mt-3 text-sm text-muted-foreground">—</div>
       ) : (
         <ul className="mt-3 grid gap-2">
           {aggregates.map((a) => {
@@ -73,7 +73,7 @@ export function WorkshopDemand({
                   <span
                     className={`w-28 shrink-0 truncate rounded-full px-2 py-0.5 text-center text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${resourceCategoryClass(a.category)}`}
                   >
-                    {a.category}
+                    {t(`category.${a.category}`)}
                   </span>
                   <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
                     <div

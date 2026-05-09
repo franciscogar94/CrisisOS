@@ -2,25 +2,33 @@
 
 import { useMemo } from "react";
 import { Check } from "lucide-react";
-import type { ChecklistItem } from "@/lib/leads/types";
+import type { ChecklistItem, ChecklistPriority } from "@/lib/leads/types";
 import { CHECKLIST_PRIORITIES } from "@/lib/leads/types";
 import { checklistProgress } from "@/lib/leads/derive";
+import { useLocale } from "@/lib/i18n/context";
 
 export interface EvacuationChecklistProps {
   items: ChecklistItem[];
   onToggle: (itemId: string) => void;
 }
 
-const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
-  immediate: { label: "Immediate", color: "bg-rose-500" },
-  "short-term": { label: "Short term", color: "bg-amber-500" },
-  "long-term": { label: "Long term", color: "bg-emerald-500" },
+const PRIORITY_COLOR: Record<ChecklistPriority, string> = {
+  immediate: "bg-rose-500",
+  "short-term": "bg-amber-500",
+  "long-term": "bg-emerald-500",
+};
+
+const PRIORITY_KEY: Record<ChecklistPriority, string> = {
+  immediate: "priority.immediate",
+  "short-term": "priority.short",
+  "long-term": "priority.long",
 };
 
 export function EvacuationChecklist({
   items,
   onToggle,
 }: EvacuationChecklistProps) {
+  const { t } = useLocale();
   const progress = useMemo(() => checklistProgress(items), [items]);
 
   const grouped = useMemo(() => {
@@ -35,7 +43,7 @@ export function EvacuationChecklist({
   if (items.length === 0) {
     return (
       <div className="flex w-full items-center justify-center text-sm text-muted-foreground">
-        No checklist items yet.
+        —
       </div>
     );
   }
@@ -46,7 +54,7 @@ export function EvacuationChecklist({
         <div className="flex items-center justify-between">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-              progress
+              {t("checklist.progress")}
             </div>
             <div className="text-2xl font-semibold text-foreground">
               {progress.done} / {progress.total}{" "}
@@ -56,7 +64,7 @@ export function EvacuationChecklist({
             </div>
           </div>
           <div className="text-right font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            evacuation checklist
+            {t("checklist.title")}
           </div>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
@@ -70,23 +78,22 @@ export function EvacuationChecklist({
       <div className="grid gap-4 lg:grid-cols-3">
         {CHECKLIST_PRIORITIES.map((priority) => {
           const phaseItems = grouped[priority] ?? [];
-          const meta = PRIORITY_LABELS[priority];
           return (
             <section
               key={priority}
               className="rounded-xl border border-border bg-background p-3"
             >
               <header className="flex items-center gap-2 pb-2">
-                <span className={`size-2 rounded-full ${meta.color}`} />
+                <span className={`size-2 rounded-full ${PRIORITY_COLOR[priority]}`} />
                 <span className="text-sm font-semibold text-foreground">
-                  {meta.label}
+                  {t(PRIORITY_KEY[priority])}
                 </span>
                 <span className="ml-auto font-mono text-[10px] text-muted-foreground">
                   {phaseItems.filter((i) => i.checked).length}/{phaseItems.length}
                 </span>
               </header>
               {phaseItems.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No items.</p>
+                <p className="text-xs text-muted-foreground">{t("checklist.empty.section")}</p>
               ) : (
                 <ul className="grid gap-1.5">
                   {phaseItems.map((item) => (
