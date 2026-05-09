@@ -7,6 +7,7 @@
   <img src="apps/frontend/public/banner.jpg" alt="CrisisOS hero" width="780" />
 </p>
 
+**Live demo:** https://crisisos-frontend.vercel.app/leads
 **Demo video:** _TODO — paste URL here_
 
 ---
