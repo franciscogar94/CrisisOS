@@ -13,70 +13,117 @@ with "Duplicate function declaration found: <name>". They live here as a
 quick contract reference for anyone reading the agent code. The actual
 schema is in `apps/frontend/src/app/leads/page.tsx`.
 
-The state shape mirrors the React `AgentState` shape; canvas state flows
-through CopilotKit's shared-state mechanism (`useAgent` +
-`agent.setState(...)`), not via the deepagents API. `create_deep_agent`
-does not accept (and does not need) a `state_schema=` kwarg.
-
 Frontend tool surface (all declared on the React side):
 
   state mutators:
-    setHeader, setLeads, setSyncMeta, setFilter, clearFilters,
-    highlightLeads, selectLead, commitLeadEdit
+    setHeader, setCrisis, setSafeZones, setChecklist, setResources,
+    setAlerts, setTimeline, setWeather, toggleChecklistItem,
+    updateResource, setActiveModule, highlightZones, selectZone
   controlled gen UI:
-    renderLeadMiniCard, renderWorkshopDemand
-  open gen UI:
-    everything else falls through `useDefaultRenderTool` to a generic
-    CopilotKit-branded card.
+    renderCrisisMiniCard, renderEvacChecklist, renderResourceStatus
 """
 
 from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict
 from typing_extensions import NotRequired
 
 
-# --- Lead shape (mirrors apps/frontend/src/lib/leads/types.ts) -------------
+# --- Crisis domain shapes (mirror apps/frontend/src/lib/leads/types.ts) ---
 
 
-class Lead(TypedDict, total=False):
-    id: str
-    url: str
+class LatLng(TypedDict, total=False):
+    lat: float
+    lng: float
+
+
+class CrisisLocation(TypedDict, total=False):
+    lat: float
+    lng: float
     name: str
-    company: str
-    email: str
-    role: str
-    phone: str
-    source: str
-    technical_level: str
-    interested_in: List[str]
-    tools: List[str]
-    workshop: str
+
+
+class Crisis(TypedDict, total=False):
+    id: str
+    type: str
+    severity: str
+    title: str
+    description: str
+    location: CrisisLocation
+    affectedRadius: float
+    timestamp: str
+
+
+class SafeZone(TypedDict, total=False):
+    id: str
+    name: str
+    type: str
+    location: LatLng
+    capacity: int
     status: str
-    opt_in: bool
+    distance: float
+    phone: str
+
+
+class ChecklistItem(TypedDict, total=False):
+    id: str
+    text: str
+    checked: bool
+    priority: str
+    category: str
+
+
+class Resource(TypedDict, total=False):
+    id: str
+    name: str
+    category: str
+    have: int
+    need: int
+    unit: str
+    critical: bool
+
+
+class ServiceAlert(TypedDict, total=False):
+    id: str
+    service: str
+    status: str
     message: str
-    submitted_at: str
+    updatedAt: str
 
 
-class LeadFilter(TypedDict):
-    workshops: List[str]
-    technical_levels: List[str]
-    tools: List[str]
-    opt_in: Literal["any", "yes", "no"]
+class TimelineEntry(TypedDict, total=False):
+    id: str
+    phase: str
+    action: str
+    completed: bool
+    order: int
+
+
+class WeatherData(TypedDict, total=False):
+    temperature: float
+    windSpeed: float
+    humidity: float
+    description: str
+    alerts: List[str]
+
+
+class CrisisFilter(TypedDict, total=False):
+    severities: List[str]
+    zoneTypes: List[str]
     search: str
 
 
-class SyncMeta(TypedDict):
-    databaseId: str
-    databaseTitle: str
-    syncedAt: Optional[str]
-
-
 class CanvasState(TypedDict):
-    leads: List[Lead]
-    filter: LeadFilter
-    highlightedLeadIds: List[str]
-    selectedLeadId: Optional[str]
+    crisis: NotRequired[Optional[Crisis]]
+    safeZones: NotRequired[List[SafeZone]]
+    checklist: NotRequired[List[ChecklistItem]]
+    resources: NotRequired[List[Resource]]
+    alerts: NotRequired[List[ServiceAlert]]
+    timeline: NotRequired[List[TimelineEntry]]
+    weather: NotRequired[Optional[WeatherData]]
+    filter: NotRequired[CrisisFilter]
+    highlightedZoneIds: NotRequired[List[str]]
+    selectedZoneId: NotRequired[Optional[str]]
     header: NotRequired[Dict[str, str]]
-    sync: NotRequired[SyncMeta]
+    activeModule: NotRequired[str]
 
 
 # --- Frontend tool contract (documentation only — NOT registered) ---------
@@ -90,74 +137,124 @@ class CanvasState(TypedDict):
 
 
 def setHeader(
-    title: Annotated[Optional[str], "New workspace heading title."] = None,
-    subtitle: Annotated[Optional[str], "New workspace heading subtitle."] = None,
+    title: Annotated[Optional[str], "New canvas heading title."] = None,
+    subtitle: Annotated[Optional[str], "New canvas heading subtitle."] = None,
 ) -> str:
-    """Set the workspace heading."""
+    """Set the canvas heading."""
     return f"setHeader({title}, {subtitle})"
 
 
-def setLeads(
-    leads: Annotated[List[Lead], "Full lead list — replaces canvas state."],
+def setCrisis(
+    crisis: Annotated[Crisis, "Full Crisis object — replaces canvas state."],
 ) -> str:
-    """REPLACE the entire canvas lead list."""
-    return f"setLeads({len(leads)} leads)"
+    """REPLACE the active crisis."""
+    return f"setCrisis({crisis.get('title', '?')})"
 
 
-def setSyncMeta(
-    databaseId: Annotated[Optional[str], "Notion DB id (or 'local')."] = None,
-    databaseTitle: Annotated[Optional[str], "Notion DB title."] = None,
-    syncedAt: Annotated[Optional[str], "ISO timestamp of last sync."] = None,
+def setSafeZones(
+    zones: Annotated[List[SafeZone], "Full zone list — replaces canvas state."],
 ) -> str:
-    """Record which lead store the canvas mirrors."""
-    return f"setSyncMeta({databaseId}, {databaseTitle}, {syncedAt})"
+    """REPLACE the safe-zones list on the canvas."""
+    return f"setSafeZones({len(zones)} zones)"
 
 
-def setFilter(
-    patch: Annotated[Dict[str, Any], "Partial LeadFilter patch."],
+def setChecklist(
+    items: Annotated[List[ChecklistItem], "Full checklist — replaces canvas state."],
 ) -> str:
-    """Partial-merge into the canvas filter."""
-    return f"setFilter({patch})"
+    """REPLACE the evacuation / response checklist."""
+    return f"setChecklist({len(items)} items)"
 
 
-def clearFilters() -> str:
-    """Reset all filters to their empty defaults."""
-    return "clearFilters()"
-
-
-def highlightLeads(
-    leadIds: Annotated[List[str], "Lead ids to visually highlight."],
+def setResources(
+    resources: Annotated[List[Resource], "Full resource list — replaces canvas state."],
 ) -> str:
-    """Highlight a set of cards (visual emphasis only — not a filter)."""
-    return f"highlightLeads({leadIds})"
+    """REPLACE the resource have/need list."""
+    return f"setResources({len(resources)} resources)"
 
 
-def selectLead(
-    leadId: Annotated[Optional[str], "Lead id to open, or None to close."],
+def setAlerts(
+    alerts: Annotated[List[ServiceAlert], "Full alert list — replaces canvas state."],
 ) -> str:
-    """Open / close the lead detail panel."""
-    return f"selectLead({leadId})"
+    """REPLACE the service-alert list."""
+    return f"setAlerts({len(alerts)} alerts)"
 
 
-def commitLeadEdit(
-    leadId: Annotated[str, "Lead id."],
-    patch: Annotated[Dict[str, Any], "Partial Lead patch."],
+def setTimeline(
+    entries: Annotated[List[TimelineEntry], "Full timeline — replaces canvas state."],
 ) -> str:
-    """Persist a single-lead patch to Notion AND to canvas state."""
-    return f"commitLeadEdit({leadId}, {patch})"
+    """REPLACE the response-timeline entries."""
+    return f"setTimeline({len(entries)} entries)"
 
 
-def renderLeadMiniCard(
-    leadId: Annotated[str, "Real lead id — see find_lead."],
-    name: Annotated[Optional[str], "Optional display name."] = None,
+def setWeather(
+    weather: Annotated[WeatherData, "Weather snapshot — replaces canvas state."],
 ) -> str:
-    """Render an inline lead card in the chat stream."""
-    return f"renderLeadMiniCard({leadId}, {name})"
+    """REPLACE the weather data."""
+    return f"setWeather({weather.get('temperature', '?')}°)"
 
 
-def renderWorkshopDemand() -> str:
-    """Render an inline mini-chart of workshop demand."""
-    return "renderWorkshopDemand()"
+def toggleChecklistItem(
+    itemId: Annotated[str, "Checklist item id to flip checked/unchecked."],
+) -> str:
+    """Flip the checked flag on a single checklist item."""
+    return f"toggleChecklistItem({itemId})"
+
+
+def updateResource(
+    resourceId: Annotated[str, "Resource id to update."],
+    have: Annotated[int, "New 'have' value (0..need)."],
+) -> str:
+    """Update the 'have' value of a single resource."""
+    return f"updateResource({resourceId}, have={have})"
+
+
+def setActiveModule(
+    module: Annotated[
+        str, "Active canvas tab: overview | map | checklist | resources | timeline | alerts."
+    ],
+) -> str:
+    """Switch the active canvas module/tab."""
+    return f"setActiveModule({module})"
+
+
+def highlightZones(
+    zoneIds: Annotated[List[str], "Zone ids to visually highlight on the map."],
+) -> str:
+    """Highlight specific zones (visual emphasis only — not a filter)."""
+    return f"highlightZones({zoneIds})"
+
+
+def selectZone(
+    zoneId: Annotated[Optional[str], "Zone id to open, or None to close."],
+) -> str:
+    """Open / close the safe-zone detail panel."""
+    return f"selectZone({zoneId})"
+
+
+def renderCrisisMiniCard(
+    crisisId: Annotated[str, "Crisis id (from state.crisis.id)."],
+    title: Annotated[Optional[str], "Optional title override."] = None,
+) -> str:
+    """Render an inline crisis summary card in the chat stream."""
+    return f"renderCrisisMiniCard({crisisId}, {title})"
+
+
+def renderEvacChecklist(
+    priority: Annotated[
+        Optional[str], "Filter by 'immediate' | 'short-term' | 'long-term' | None."
+    ] = None,
+) -> str:
+    """Render an inline interactive evacuation checklist in the chat stream."""
+    return f"renderEvacChecklist({priority})"
+
+
+def renderResourceStatus(
+    category: Annotated[
+        Optional[str], "Filter by 'water' | 'food' | 'medical' | etc. | None."
+    ] = None,
+) -> str:
+    """Render an inline resource have/need bar chart in the chat stream."""
+    return f"renderResourceStatus({category})"
 
 
 # --- Export list ----------------------------------------------------------
