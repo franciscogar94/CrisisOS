@@ -53,7 +53,7 @@ export function PipelineBoard({
     <div className="flex min-h-0 flex-1 flex-col border border-line bg-bg-2">
       <nav
         role="tablist"
-        className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-bg-2/80 px-5"
+        className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-line bg-bg-2/80 px-3 sm:px-5"
       >
         {TABS.map((tab) => {
           const isActive = active === tab.id;
@@ -64,7 +64,7 @@ export function PipelineBoard({
               role="tab"
               aria-selected={isActive}
               onClick={() => onModuleChange(tab.id)}
-              className={`px-3 py-1.5 font-mono text-xs uppercase tracking-[0.12em] transition border-b-2 ${
+              className={`shrink-0 px-3 py-1.5 font-mono text-xs uppercase tracking-[0.12em] transition border-b-2 ${
                 isActive
                   ? "border-brand text-txt-hi"
                   : "border-transparent text-txt-low hover:text-txt-mid"
@@ -76,7 +76,7 @@ export function PipelineBoard({
           );
         })}
       </nav>
-      <div className={`flex min-h-0 flex-1 ${active === "map" ? "" : "overflow-auto p-5"}`}>
+      <div className={`flex min-h-0 flex-1 ${active === "map" ? "" : "overflow-auto p-3 sm:p-5"}`}>
         {active === "overview" ? (
           <OverviewModule state={state} />
         ) : active === "map" ? (

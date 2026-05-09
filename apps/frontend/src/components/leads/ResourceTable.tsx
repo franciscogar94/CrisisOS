@@ -95,7 +95,7 @@ export function ResourceTable({ resources, onUpdateHave }: ResourceTableProps) {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full font-mono text-sm">
+        <table className="w-full min-w-[640px] font-mono text-sm">
           <thead className="sticky top-0 bg-bg-2 text-[10px] uppercase tracking-[0.16em] text-txt-low">
             <tr className="border-b border-line">
               <th className="px-5 py-3 text-left">UNIT</th>

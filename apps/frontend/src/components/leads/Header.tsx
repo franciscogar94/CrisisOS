@@ -10,29 +10,45 @@ interface HeaderProps {
   title: string;
   subtitle: string;
   crisis: Crisis | null;
-  user?: string;
   weatherTemp?: number | null;
   weatherDesc?: string | null;
+  onOpenChat?: () => void;
+  onOpenThreads?: () => void;
+  mobileView?: "canvas" | "chat";
 }
 
 export function Header({
   title,
   subtitle,
   crisis,
-  user = "Francisco G.",
   weatherTemp,
   weatherDesc,
+  onOpenChat,
+  onOpenThreads,
+  mobileView = "canvas",
 }: HeaderProps) {
   const { t } = useLocale();
   const isCritical = crisis?.severity === "critical";
   const elapsed = useElapsed(crisis?.timestamp);
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-bg-2 px-5">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-line bg-bg-2 px-3 sm:px-5">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        {onOpenThreads ? (
+          <button
+            type="button"
+            onClick={onOpenThreads}
+            aria-label="open threads"
+            className="-ml-1 flex size-9 items-center justify-center text-txt-mid transition hover:text-txt-hi md:hidden"
+          >
+            ☰
+          </button>
+        ) : null}
         <Diamond pulse={isCritical} />
         <span className="font-mono text-xs tracking-[0.24em] text-txt-hi">CRISISOS</span>
-        <StatusBadge crisis={crisis} />
+        <span className="hidden sm:inline-flex">
+          <StatusBadge crisis={crisis} />
+        </span>
         {crisis ? (
           <span className="hidden truncate text-xs text-txt-mid sm:inline">
             {title} — {crisis.location.name ?? `${crisis.location.lat.toFixed(2)}, ${crisis.location.lng.toFixed(2)}`}
@@ -42,11 +58,15 @@ export function Header({
         )}
       </div>
 
-      <div className="flex items-center gap-3 font-mono text-[11px] text-txt-mid">
+      <div className="flex items-center gap-2 font-mono text-[11px] text-txt-mid sm:gap-3">
         {crisis && elapsed ? (
-          <span className="text-amber-700 dark:text-amber-400">T+ {elapsed}</span>
+          <span className="hidden text-amber-700 dark:text-amber-400 sm:inline">T+ {elapsed}</span>
         ) : null}
-        {crisis && elapsed ? <Pipe /> : null}
+        {crisis && elapsed ? (
+          <span className="hidden sm:inline">
+            <Pipe />
+          </span>
+        ) : null}
         {weatherTemp != null ? (
           <>
             <span className="hidden items-center gap-1.5 lg:inline-flex">
@@ -62,16 +82,31 @@ export function Header({
           </>
         ) : (
           <>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 sm:inline-flex">
               <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
               {t("header.agent_online") || "AGENT ONLINE"}
             </span>
-            <Pipe />
+            <span className="hidden sm:inline">
+              <Pipe />
+            </span>
           </>
         )}
-        <span className="text-txt-low">{user}</span>
-        <ThemeToggle />
-        <LocaleToggle />
+        <span className="hidden sm:inline-flex">
+          <ThemeToggle />
+        </span>
+        <span className="hidden sm:inline-flex">
+          <LocaleToggle />
+        </span>
+        {onOpenChat ? (
+          <button
+            type="button"
+            onClick={onOpenChat}
+            aria-label={mobileView === "chat" ? "show canvas" : "show chat"}
+            className="flex size-9 items-center justify-center border border-line text-txt-mid transition hover:border-brand hover:text-txt-hi md:hidden"
+          >
+            {mobileView === "chat" ? "▢" : "💬"}
+          </button>
+        ) : null}
       </div>
     </header>
   );

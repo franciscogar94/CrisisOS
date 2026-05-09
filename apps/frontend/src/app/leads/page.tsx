@@ -42,6 +42,7 @@ import { LeadMiniCard } from "@/components/leads/inline/LeadMiniCard";
 import { EmailDraftCard } from "@/components/leads/inline/EmailDraftCard";
 import { MockControls } from "@/components/leads/MockControls";
 import { ToolFallbackCard } from "@/components/copilot/ToolFallbackCard";
+import { ThreadsPanel } from "@/components/leads/ThreadsPanel";
 
 const MOCK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK === "1";
 
@@ -225,7 +226,17 @@ function useLiveAgentState() {
   return { agent, state, setState };
 }
 
-function CanvasInner() {
+function CanvasInner({
+  onBack,
+  onOpenThreads,
+  mobileView,
+  setMobileView,
+}: {
+  onBack?: () => void;
+  onOpenThreads?: () => void;
+  mobileView: "canvas" | "chat";
+  setMobileView: Dispatch<SetStateAction<"canvas" | "chat">>;
+}) {
   const [mockOverride, setMockOverride] = useState<AgentState | null>(null);
   const mockCtx = useMemo(
     () => ({ mockOverride, setMockOverride }),
@@ -233,12 +244,27 @@ function CanvasInner() {
   );
   return (
     <MockOverrideContext.Provider value={mockCtx}>
-      <CanvasBody />
+      <CanvasBody
+        onBack={onBack}
+        onOpenThreads={onOpenThreads}
+        mobileView={mobileView}
+        setMobileView={setMobileView}
+      />
     </MockOverrideContext.Provider>
   );
 }
 
-function CanvasBody() {
+function CanvasBody({
+  onBack,
+  onOpenThreads,
+  mobileView,
+  setMobileView,
+}: {
+  onBack?: () => void;
+  onOpenThreads?: () => void;
+  mobileView: "canvas" | "chat";
+  setMobileView: Dispatch<SetStateAction<"canvas" | "chat">>;
+}) {
   const { agent, state, setState } = useLiveAgentState();
   const mockCtx = useContext(MockOverrideContext);
   const mockOverride = mockCtx?.mockOverride ?? null;
@@ -580,7 +606,7 @@ function CanvasBody() {
 
   return (
     <>
-      <main className="flex h-screen flex-col bg-bg">
+      <main className="flex h-[100dvh] min-w-0 flex-1 flex-col bg-bg">
         <Header
           title={state.header.title}
           subtitle={
@@ -591,17 +617,35 @@ function CanvasBody() {
           crisis={state.crisis}
           weatherTemp={state.weather?.temperature ?? null}
           weatherDesc={state.weather?.description ?? null}
+          onOpenThreads={onOpenThreads}
+          onOpenChat={() =>
+            setMobileView((v) => (v === "chat" ? "canvas" : "chat"))
+          }
+          mobileView={mobileView}
         />
 
         {MOCK_ENABLED && mockActive ? (
-          <div className="flex justify-end border-b border-line bg-bg-2 px-5 py-1.5">
+          <div className="hidden justify-end border-b border-line bg-bg-2 px-5 py-1.5 sm:flex">
             <MockControls active onClear={clearMock} />
           </div>
         ) : null}
 
         <div className="flex min-h-0 flex-1">
-          <ChatPanel />
-          <section className="flex min-h-0 flex-1 flex-col">
+          <div
+            className={`${
+              mobileView === "chat" ? "flex" : "hidden"
+            } w-full min-w-0 md:flex md:w-[340px] md:shrink-0 lg:w-[380px]`}
+          >
+            <ChatPanel
+              onBack={onBack}
+              onCloseMobile={() => setMobileView("canvas")}
+            />
+          </div>
+          <section
+            className={`${
+              mobileView === "canvas" ? "flex" : "hidden"
+            } min-h-0 min-w-0 flex-1 flex-col md:flex`}
+          >
             {state.crisis === null ? (
               <EmptyCanvas onLoadMock={MOCK_ENABLED ? loadMock : undefined} />
             ) : (
@@ -685,10 +729,31 @@ function LiveResourceBars() {
 }
 
 function HomePage() {
-  const [threadId] = useState<string | undefined>(undefined);
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<"canvas" | "chat">("canvas");
+  const handleSelectThread = (id: string | undefined) => {
+    setThreadId(id);
+    setMobileView("chat");
+  };
   return (
     <CopilotChatConfigurationProvider agentId="default" threadId={threadId}>
-      <CanvasInner />
+      <div className="flex h-[100dvh] w-full">
+        {drawerOpen ? (
+          <ThreadsPanel
+            agentId="default"
+            threadId={threadId}
+            onSelect={handleSelectThread}
+            onClose={() => setDrawerOpen(false)}
+          />
+        ) : null}
+        <CanvasInner
+          onBack={() => setDrawerOpen(true)}
+          onOpenThreads={() => setDrawerOpen(true)}
+          mobileView={mobileView}
+          setMobileView={setMobileView}
+        />
+      </div>
     </CopilotChatConfigurationProvider>
   );
 }

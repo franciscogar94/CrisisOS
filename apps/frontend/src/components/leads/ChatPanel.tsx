@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   UseAgentUpdate,
   useAgent,
+  useCopilotChatConfiguration,
   useSuggestions,
+  useThreads,
 } from "@copilotkit/react-core/v2";
 
 const INITIALS_KEY = "crisisos.userInitials";
@@ -18,7 +20,10 @@ function normalizeInitials(value: string): string {
   return value.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase();
 }
 
-export function ChatPanel() {
+export function ChatPanel({
+  onBack,
+  onCloseMobile,
+}: { onBack?: () => void; onCloseMobile?: () => void } = {}) {
   const { agent } = useAgent({
     updates: [UseAgentUpdate.OnMessagesChanged, UseAgentUpdate.OnRunStatusChanged],
   });
@@ -59,6 +64,34 @@ export function ChatPanel() {
     el.scrollTop = el.scrollHeight;
   }, [visible.length, isRunning]);
 
+  // Auto-title untitled threads from first user message.
+  const config = useCopilotChatConfiguration();
+  const threadId = config?.threadId;
+  const agentId = config?.agentId ?? "default";
+  const { threads, renameThread } = useThreads({ agentId });
+  const renamedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!threadId || renamedRef.current.has(threadId)) return;
+    const thread = threads.find((t) => t.id === threadId);
+    if (!thread) return;
+    if (thread.name) {
+      renamedRef.current.add(threadId);
+      return;
+    }
+    const firstUser = messages.find((m) => m.role === "user");
+    if (!firstUser) return;
+    const text = asText(firstUser.content).trim();
+    if (!text) return;
+    const title = text.replace(/\s+/g, " ").slice(0, 60).trim();
+    if (!title) return;
+    renamedRef.current.add(threadId);
+    void renameThread(threadId, title).catch((err) => {
+      console.error("[ChatPanel] renameThread failed", err);
+      renamedRef.current.delete(threadId);
+    });
+  }, [threadId, threads, messages, renameThread]);
+
   async function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || !agent) return;
@@ -82,31 +115,37 @@ export function ChatPanel() {
   }
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-r border-line bg-bg-2">
+    <aside className="flex h-full w-full min-w-0 flex-1 flex-col border-r border-line bg-bg-2">
       {/* Header */}
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4 font-mono text-xs">
-        <span className="tracking-[0.24em] text-txt-low">// COPILOT</span>
+        <div className="flex items-center gap-2">
+          {onCloseMobile ? (
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              aria-label="back to canvas"
+              className="-ml-2 flex size-8 items-center justify-center text-txt-low transition hover:text-txt-hi md:hidden"
+            >
+              ‹
+            </button>
+          ) : null}
+          <span className="tracking-[0.24em] text-txt-low">// COPILOT</span>
+        </div>
         <div className="flex items-center gap-3">
           {!empty ? (
             <>
               <button
                 type="button"
                 onClick={() => {
-                  if (isRunning || !agent) return;
-                  const all = (agent.messages ?? []) as Array<{ role: string }>;
-                  let cut = all.length;
-                  while (cut > 0 && all[cut - 1].role !== "user") cut--;
-                  if (cut > 0 && all[cut - 1].role === "user") cut--;
-                  (agent as { setMessages: (m: unknown[]) => void }).setMessages(
-                    all.slice(0, cut),
-                  );
+                  if (isRunning) return;
+                  onBack?.();
                 }}
-                disabled={isRunning}
+                disabled={isRunning || !onBack}
                 className="text-txt-low transition hover:text-txt-hi disabled:opacity-40 disabled:hover:text-txt-low"
-                title="Undo last turn"
-                aria-label="undo last turn"
+                title="Open threads"
+                aria-label="open threads"
               >
-                ↶ ATRÁS
+                ☰ THREADS
               </button>
               <button
                 type="button"
@@ -165,7 +204,10 @@ export function ChatPanel() {
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-line p-3">
+      <div
+        className="shrink-0 border-t border-line p-3"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         <div className="flex items-center gap-2 border border-line bg-bg px-3 py-2.5 transition focus-within:border-brand">
           <span className="font-mono text-xs text-txt-low">›</span>
           <textarea
@@ -174,7 +216,7 @@ export function ChatPanel() {
             onKeyDown={onKeyDown}
             rows={1}
             placeholder={empty ? "Describe the emergency…" : "Refine, escalate, or ask…"}
-            className="max-h-32 flex-1 resize-none bg-transparent text-sm text-txt-hi placeholder:text-txt-low focus:outline-none"
+            className="max-h-32 flex-1 resize-none bg-transparent text-base text-txt-hi placeholder:text-txt-low focus:outline-none md:text-sm"
           />
           <button
             type="button"
